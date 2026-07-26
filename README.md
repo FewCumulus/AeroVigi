@@ -3,8 +3,12 @@
 Signalement de feux de forêt depuis un avion léger. Une position, un type de feu,
 un SMS au **114** — sans couverture data.
 
-État : **MVP Android**, France. Voir [docs/00-plan-produit.md](docs/00-plan-produit.md)
-pour la suite (planification des vols, Espagne, iOS).
+État : **MVP Android**, France.
+
+| Document | Contenu |
+|---|---|
+| [docs/00-plan-produit.md](docs/00-plan-produit.md) | Plan produit et technique : contraintes, architecture, suite (feux partagés, planification des vols, Espagne) |
+| [docs/02-ios-app-store.md](docs/02-ios-app-store.md) | Portage iOS et publication App Store : prérequis, chaîne de compilation, différences de comportement, revue Apple |
 
 ---
 
@@ -153,6 +157,27 @@ utilisateur), et qu'une publication Play Store ultérieure serait bloquée.
 ```bash
 cd apps/mobile && npx expo start
 ```
+
+### iOS
+
+Le code est prêt : aucun module natif propre à Android, et le bloc `ios` de
+`app.json` est renseigné (identifiant, icône sans canal alpha, chaîne
+d'autorisation de localisation, conformité export). Il n'y a pas de dossier
+`ios/` — le projet Xcode est généré à la demande.
+
+Compiler pour iOS exige macOS, ce qui, depuis Windows, passe par EAS Build :
+
+```bash
+cd apps/mobile && eas build --platform ios --profile preview
+```
+
+Les prérequis, les différences de comportement et ce qu'Apple demande à la
+revue sont détaillés dans
+[docs/02-ios-app-store.md](docs/02-ios-app-store.md). Deux points à connaître
+avant de s'engager : le compte Apple Developer coûte 99 $ par an et sa
+validation prend de quelques jours à deux semaines ; et il reste un correctif à
+faire côté code — la **position approximative** d'iOS 14+ et d'Android 12+
+produirait une maille DFCI fausse (voir §7 du même document).
 
 ---
 
