@@ -11,23 +11,31 @@
 const fs = require('fs');
 const path = require('path');
 
-const ANDROID = path.join(__dirname, '..', 'apps', 'mobile', 'android');
+const MOBILE = path.join(__dirname, '..', 'apps', 'mobile');
+const ANDROID = path.join(MOBILE, 'android');
 const GRADLE = path.join(ANDROID, 'app', 'build.gradle');
 const PROPS = path.join(ANDROID, 'gradle.properties');
-const KEYSTORE = path.join(ANDROID, 'app', 'vigiaero-release.keystore');
+// La clé vit HORS de android/ : ce dossier est régénéré par `expo prebuild`,
+// qui emporterait la clé avec lui. Perdre la clé de signature signifie que les
+// mises à jour ne s'installent plus par-dessus la version précédente.
+const KEYSTORE_SRC = path.join(MOBILE, 'keystore', 'vigiaero-release.keystore');
+const KEYSTORE_DST = path.join(ANDROID, 'app', 'vigiaero-release.keystore');
 
 if (!fs.existsSync(GRADLE)) {
     console.error('android/ absent — lancez d’abord : npx expo prebuild --platform android');
     process.exit(1);
 }
-if (!fs.existsSync(KEYSTORE)) {
+if (!fs.existsSync(KEYSTORE_SRC)) {
     console.error(
         'Clé de signature absente. Générez-la avec :\n' +
-            '  keytool -genkeypair -v -storetype PKCS12 -keystore apps/mobile/android/app/vigiaero-release.keystore \\\n' +
+            '  keytool -genkeypair -v -storetype PKCS12 \\\n' +
+            '    -keystore apps/mobile/keystore/vigiaero-release.keystore \\\n' +
             '    -alias vigiaero -keyalg RSA -keysize 2048 -validity 10000',
     );
     process.exit(1);
 }
+fs.mkdirSync(path.dirname(KEYSTORE_DST), { recursive: true });
+fs.copyFileSync(KEYSTORE_SRC, KEYSTORE_DST);
 
 let gradle = fs.readFileSync(GRADLE, 'utf8');
 

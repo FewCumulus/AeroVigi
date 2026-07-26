@@ -1,0 +1,16 @@
+# Dépendances et artefacts de compilation
+node_modules/
+apps/mobile/android/
+apps/mobile/ios/
+apps/mobile/.expo/
+*.apk
+*.aab
+
+# Secrets — ne jamais versionner
+.env
+.env.local
+*.keystore
+
+# Système
+.DS_Store
+Thumbs.db

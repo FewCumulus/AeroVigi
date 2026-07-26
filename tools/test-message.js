@@ -61,10 +61,14 @@ const { importApp } = require('./_apptest');
     eq('heure UTC', hhmmUtc(new Date(Date.UTC(2026, 6, 26, 4, 7))), '0407');
     eq('mètres → pieds arrondis', String(metersToFt(1066.8)), '3500');
     eq('altitude absente', String(metersToFt(null)), 'null');
+    // Un récepteur sans solution verticale rend 0,0 m : ce n'est pas « au
+    // niveau de la mer », c'est une absence de mesure. Constaté sur appareil.
+    eq('altitude nulle traitée comme absente', String(metersToFt(0)), 'null');
+    eq('altitude négative réelle conservée', String(metersToFt(-30)), '-100');
 
     console.log('\n5. Message d’alerte complet');
     const observer = {
-        name: 'S.BESNIER',
+        name: 'JO PILOTE',
         aircraftReg: 'F-GXYZ',
         radioFreq: '123.500',
         mentionInFlight: true,
@@ -76,7 +80,7 @@ const { importApp } = require('./_apptest');
             altitudeM: 1066.8,
             fireType: 'foret',
             severity: 'important',
-            source: 'vertical',
+            intention: 'reste',
             at: new Date(Date.UTC(2026, 6, 26, 14, 32)),
         },
         observer,
@@ -96,22 +100,80 @@ const { importApp } = require('./_apptest');
         `${built.sms.chars} caractères, ${built.sms.segments} segment(s)`,
     );
 
-    // Le pointage carte doit être annoncé comme tel : le destinataire doit
-    // savoir que le point n'a pas été relevé à la verticale.
-    const pointed = message.buildAlertMessage(
+    check('intention transmise', built.text.includes('Je reste sur zone'), built.text);
+
+    // L'intention dit au CODIS s'il peut compter sur un observateur au-dessus
+    // du feu : les deux formulations doivent passer, y compris la plus longue.
+    const leaving = message.buildAlertMessage(
+        {
+            lat: 43.5297,
+            lon: 5.4474,
+            altitudeM: 1066.8,
+            fireType: 'batiment',
+            severity: null,
+            intention: 'poursuit',
+            at: new Date(Date.UTC(2026, 6, 26, 14, 32)),
+        },
+        observer,
+    );
+    check('seconde intention transmise', leaving.text.includes('Je poursuis ma route'));
+    check(
+        'seconde intention tient en un SMS',
+        leaving.sms.segments === 1,
+        `${leaving.sms.chars} caractères`,
+    );
+
+    const noAlt = message.buildAlertMessage(
         {
             lat: 43.5297,
             lon: 5.4474,
             altitudeM: null,
             fireType: 'batiment',
             severity: null,
-            source: 'map',
+            intention: null,
             at: new Date(Date.UTC(2026, 6, 26, 14, 32)),
         },
         observer,
     );
-    check('pointage carte signalé', pointed.text.includes('Point releve sur carte'), pointed.text);
-    check('pas d’altitude si inconnue', !pointed.text.includes('ft GPS'));
+    check('pas d’altitude si inconnue', !noAlt.text.includes('ft GPS'));
+
+    console.log('\n5b. Messages de suivi');
+    const update = message.buildAlertMessage(
+        {
+            lat: 43.5297,
+            lon: 5.4474,
+            altitudeM: 1066.8,
+            fireType: 'vehicules',
+            // Une ampleur résiduelle ne doit pas polluer un message de suivi.
+            severity: 'important',
+            intention: 'poursuit',
+            at: new Date(Date.UTC(2026, 6, 26, 15, 10)),
+        },
+        observer,
+    );
+    console.log('\n--- suivi ---\n' + update.text + '\n-------------');
+    check(
+        'suivi « véhicules » en tête',
+        update.text.startsWith('VEHICULES INTERVENTION SUR PLACE vu d avion'),
+    );
+    check('ampleur ignorée sur un suivi', !update.text.includes('IMPORTANT'));
+    check('suivi : même position DFCI', update.dfci === 'KD44F0');
+    check('suivi tient en un SMS', update.sms.segments === 1, `${update.sms.chars} caractères`);
+
+    const contained = message.buildAlertMessage(
+        {
+            lat: 43.5297,
+            lon: 5.4474,
+            altitudeM: 1066.8,
+            fireType: 'maitrise',
+            severity: null,
+            intention: 'poursuit',
+            at: new Date(Date.UTC(2026, 6, 26, 15, 40)),
+        },
+        observer,
+    );
+    check('suivi « maîtrisé »', contained.text.startsWith('FEU SEMBLE MAITRISE vu d avion'));
+    check('suivi « maîtrisé » tient en un SMS', contained.sms.segments === 1);
 
     // Cas défavorable : nom long, pour vérifier que le compteur reste juste.
     const long = message.buildAlertMessage(
@@ -121,7 +183,7 @@ const { importApp } = require('./_apptest');
             altitudeM: 1066.8,
             fireType: 'fumee',
             severity: 'important',
-            source: 'map',
+            intention: 'poursuit',
             at: new Date(),
         },
         {
@@ -152,7 +214,7 @@ const { importApp } = require('./_apptest');
             altitudeM: 1066.8,
             fireType: 'vegetation',
             severity: 'important',
-            source: 'map',
+            intention: 'reste',
             at: new Date(),
         },
         {

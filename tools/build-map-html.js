@@ -47,7 +47,20 @@ const PAGE = (css, js) => `<!DOCTYPE html>
     border-bottom:26px solid #0a58ff;
     filter: drop-shadow(0 0 2px #fff) drop-shadow(0 0 2px #fff);
   }
-  .fire { font-size:22px; line-height:22px; text-align:center; text-shadow:0 0 3px #fff,0 0 3px #fff; }
+  .fire {
+    font-size:26px; line-height:30px; text-align:center; cursor:pointer;
+    text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 5px #fff;
+    position:relative;
+  }
+  .fire-done { filter: grayscale(1); opacity:0.6; }
+  /* Heure du signalement, collée sous le marqueur : le pilote repasse souvent
+     sur une zone déjà traitée et doit distinguer ses feux d'un coup d'oeil. */
+  .fire-tag {
+    position:absolute; top:26px; left:50%; transform:translateX(-50%);
+    font-size:11px; line-height:13px; font-weight:700; white-space:nowrap;
+    background:rgba(255,255,255,0.9); color:#0d1117;
+    border-radius:4px; padding:0 3px; text-shadow:none;
+  }
   .crosshair {
     position:absolute; left:50%; top:50%; z-index:900;
     width:44px; height:44px; margin:-22px 0 0 -22px; pointer-events:none; display:none;
@@ -85,7 +98,10 @@ const PAGE = (css, js) => `<!DOCTYPE html>
     attribution: '&copy; OpenStreetMap | aeronautique &copy; OpenAIP'
   }).addTo(map);
 
-  var aip = L.tileLayer(OPENAIP_URL, { maxZoom: 14, subdomains: 'abc', opacity: 0.85 });
+  // Cree meme sans URL : la couche existe pour que setAipUrl puisse l'activer
+  // plus tard si une cle est saisie, mais elle n'est ajoutee a la carte que
+  // lorsqu'elle a une URL exploitable.
+  var aip = L.tileLayer(OPENAIP_URL || '', { maxZoom: 14, subdomains: 'abc', opacity: 0.85 });
   if (OPENAIP_URL) aip.addTo(map);
 
   var own = null, ownAcc = null, follow = true, pointing = false;
@@ -123,14 +139,44 @@ const PAGE = (css, js) => `<!DOCTYPE html>
       var c = map.getCenter();
       send({ type: 'point', lat: c.lat, lng: c.lng });
     },
-    addFire: function (id, lat, lon) {
-      L.marker([lat, lon], {
-        icon: L.divIcon({ className: '', html: '<div class="fire">&#128293;</div>', iconSize: [22, 22], iconAnchor: [11, 11] })
-      }).addTo(fires);
+    /**
+     * (Re)pose l'ensemble des feux signalés. list = [{id, lat, lon, label,
+     * done}] ; done grise le marqueur (feu annonce maitrise). Un appui sur un
+     * marqueur remonte son identifiant au natif, qui rouvre la fiche du feu.
+     */
+    setFires: function (list) {
+      fires.clearLayers();
+      list.forEach(function (f) {
+        var cls = 'fire' + (f.done ? ' fire-done' : '');
+        L.marker([f.lat, f.lon], {
+          icon: L.divIcon({
+            className: '',
+            html: '<div class="' + cls + '">&#128293;<span class="fire-tag">' + f.label + '</span></div>',
+            iconSize: [30, 30],
+            iconAnchor: [15, 15],
+          }),
+          // Cible tactile élargie : on vise un marqueur en turbulence.
+          riseOnHover: true,
+        })
+          .addTo(fires)
+          .on('click', function (e) {
+            L.DomEvent.stopPropagation(e);
+            send({ type: 'fire', id: f.id });
+          });
+      });
     },
     clearFires: function () { fires.clearLayers(); },
     zoom: function (d) { map.setZoom(map.getZoom() + d); },
-    setAip: function (v) { if (v) { aip.addTo(map); } else { map.removeLayer(aip); } }
+    /**
+     * Change la surcouche aeronautique a chaud. Une chaine vide la retire :
+     * c'est le cas quand aucune cle OpenAIP n'est configuree, ou quand le
+     * pilote desactive le calque.
+     */
+    setAipUrl: function (url) {
+      if (!url) { if (map.hasLayer(aip)) map.removeLayer(aip); return; }
+      aip.setUrl(url);
+      if (!map.hasLayer(aip)) aip.addTo(map);
+    }
   };
 
   map.on('click', function (e) {

@@ -266,6 +266,27 @@ choisir une route et des zones que personne ne couvre sur son créneau.
 
 ### 5.2 Modèle de données (PostgreSQL + PostGIS)
 
+### 5.1 bis — Feux partagés (demandé le 27/07/2026)
+
+Les feux signalés sont déjà reportés sur la carte du téléphone qui les a émis, avec l'heure
+du signalement, et un appui sur le marqueur rouvre la fiche pour un message de suivi. La
+suite consiste à **remonter ces alertes au serveur pour les rendre visibles par tous les
+utilisateurs**, avec date et heure.
+
+Ce que cela apporte, au-delà du confort : un pilote qui arrive sur zone voit qu'un feu est
+déjà signalé et **n'envoie pas un doublon au 114**. C'est l'argument le plus solide à
+présenter aux services de secours.
+
+Points à trancher au moment de le faire :
+- **durée de vie d'un marqueur** : un feu signalé à 14 h n'a plus d'intérêt le lendemain ;
+  proposer une extinction automatique (par exemple 12 h) plus l'état « maîtrisé » ;
+- **confiance** : n'importe qui pouvant poser un marqueur, prévoir au minimum un compte
+  identifié et la possibilité pour un coordinateur de retirer un signalement erroné ;
+- **hors ligne** : la remontée doit être différée et rejouée, jamais bloquante pour
+  l'alerte SMS elle-même.
+
+### 5.2 Modèle de données
+
 ```
 pilot(id, name, email, phone, org_id, …)
 aircraft(id, registration, type, default_freq, owner_pilot_id)
@@ -282,7 +303,15 @@ fire_report(id, pilot_id, mission_id?, geom POINT, fire_type, severity,
 - Couverture / trous : grille H3 (résolution 6 ≈ 36 km²) sur la région ; une cellule est
   « couverte » si une zone d'observation active l'intersecte sur la fenêtre demandée.
 
-### 5.3 API
+### 5.3 Relais de tuiles OpenAIP
+
+À prévoir en même temps que le serveur, pour la mise en accès libre (voir README, section
+« Clé OpenAIP ») : un point d'entrée `/tiles/openaip/{z}/{x}/{y}.png` qui détient la clé et
+relaie la requête. C'est la seule façon de ne pas diffuser la clé avec l'application. Un
+cache disque devant le relais réduit fortement le trafic sortant — les pilotes d'une même
+région demandent les mêmes tuiles.
+
+### 5.4 API
 
 | Méthode | Route | Rôle |
 |---|---|---|
@@ -296,7 +325,7 @@ fire_report(id, pilot_id, mission_id?, geom POINT, fire_type, severity,
 Auth JWT (email + mot de passe, ou lien magique), rôles `pilot` / `coordinator`
 (association, SDIS invité) / `admin`.
 
-### 5.4 UX de planification
+### 5.5 UX de planification
 
 - Carte + **curseur temporel** (slider horaire sur la journée) : on fait défiler l'heure, les
   routes et zones des autres missions apparaissent/disparaissent selon leur créneau.
@@ -307,7 +336,7 @@ Auth JWT (email + mot de passe, ou lien magique), rôles `pilot` / `coordinator`
 - Avertissement si conflit espace + temps avec une autre mission (< 5 NM et < 15 min).
 - Publication → visible par tous ; notification aux missions en conflit.
 
-### 5.5 Confidentialité
+### 5.6 Confidentialité
 
 Position temps réel des avions : **hors périmètre V2** (surveillance des pilotes,
 complexité, données sensibles). On partage des **intentions** (plans), pas du live. Un
