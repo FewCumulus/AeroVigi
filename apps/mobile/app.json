@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "VigiAero",
+    "slug": "vigiaero",
+    "scheme": "vigiaero",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "VigiAero utilise votre position pour situer le feu que vous signalez aux secours."
+        }
+      ]
+    ],
+    "ios": {
+      "bundleIdentifier": "fr.vigiaero.app",
+      "supportsTablet": false,
+      "icon": "./assets/icon-ios.png",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "VigiAero utilise votre position pour indiquer aux secours l’endroit exact du feu que vous signalez.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "fr.vigiaero.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#32A6F9",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png"
+      },
+      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"],
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}
