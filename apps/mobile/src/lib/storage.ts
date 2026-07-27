@@ -82,6 +82,28 @@ export async function addReport(r: StoredReport): Promise<StoredReport[]> {
 }
 
 /**
+ * Supprime des feux et, avec eux, leurs messages de suivi — sans quoi il
+ * resterait des suivis orphelins dans l'historique.
+ *
+ * Ce qui est effacé ici l'est sur le téléphone seulement : un SMS déjà parti
+ * reste parti. C'est ce que l'écran de confirmation doit dire à l'utilisateur.
+ */
+export async function deleteFires(fireIds: string[]): Promise<StoredReport[]> {
+    const ids = new Set(fireIds);
+    const kept = (await loadReports()).filter(
+        (r) => !ids.has(r.id) && !(r.parentId && ids.has(r.parentId)),
+    );
+    await AsyncStorage.setItem(K_REPORTS, JSON.stringify(kept));
+    return kept;
+}
+
+/** Identifiants des feux signalés il y a plus de `hours` heures. */
+export function fireIdsOlderThan(fires: MappedFire[], hours: number): string[] {
+    const cutoff = Date.now() - hours * 3600_000;
+    return fires.filter((f) => new Date(f.at).getTime() < cutoff).map((f) => f.id);
+}
+
+/**
  * Les feux à représenter sur la carte : une entrée par alerte initiale
  * effectivement transmise. Les suivis n'ajoutent pas de marqueur, ils
  * enrichissent celui du feu d'origine.

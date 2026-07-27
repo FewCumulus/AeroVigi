@@ -6,7 +6,7 @@
  * code et l'APK.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { StatusBar, StyleSheet, View, ActivityIndicator } from 'react-native';
+import { BackHandler, StatusBar, StyleSheet, View, ActivityIndicator } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SMS from 'expo-sms';
 import { MapScreen, type PickedPoint } from './src/screens/MapScreen';
@@ -19,6 +19,7 @@ import { useAircraftPosition } from './src/lib/useAircraftPosition';
 import {
     EMPTY_PROFILE,
     addReport,
+    deleteFires,
     firesFromReports,
     hasAccepted,
     loadProfile,
@@ -90,6 +91,10 @@ export default function App() {
         [fires, grab],
     );
 
+    const onDeleteFires = useCallback(async (ids: string[]) => {
+        setReports(await deleteFires(ids));
+    }, []);
+
     // La carte reste montée dès qu'on y est passé une fois, et les autres
     // écrans se superposent. La démonter rechargerait ses tuiles au retour —
     // c'est-à-dire une carte vide après chaque signalement fait hors couverture,
@@ -97,6 +102,37 @@ export default function App() {
     useEffect(() => {
         if (screen.name === 'map') setMapMounted(true);
     }, [screen.name]);
+
+    /**
+     * Bouton retour d'Android.
+     *
+     * Par défaut il ferme l'application. En vol, c'est le pire comportement
+     * possible : un geste de trop et la carte est démontée, donc rechargée —
+     * et sans réseau, perdue. Chaque écran renvoie donc explicitement vers son
+     * précédent, et la carte, qui est la racine, absorbe l'appui sans rien
+     * faire. On quitte par le bouton d'accueil du téléphone.
+     */
+    useEffect(() => {
+        const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+            switch (screen.name) {
+                case 'report':
+                case 'advice':
+                case 'menu':
+                    setScreen({ name: 'map' });
+                    return true;
+                case 'profile':
+                    // Au premier lancement le profil est obligatoire : pas de retour.
+                    if (!screen.firstRun) setScreen({ name: 'menu' });
+                    return true;
+                case 'disclaimer':
+                    if (screen.readOnly) setScreen({ name: 'menu' });
+                    return true;
+                default:
+                    return true;
+            }
+        });
+        return () => sub.remove();
+    }, [screen]);
 
     const overlay = () => {
         switch (screen.name) {
@@ -145,6 +181,10 @@ export default function App() {
                         point={screen.point}
                         observer={profile}
                         parent={screen.parent}
+                        onDeleteFire={async (id) => {
+                            await onDeleteFires([id]);
+                            setScreen({ name: 'map' });
+                        }}
                         onCancel={() => setScreen({ name: 'map' })}
                         onDone={async (r) => {
                             setReports(await addReport(r));
@@ -201,6 +241,7 @@ export default function App() {
                         openAipKey={profile.openAipKey}
                         onPick={onPick}
                         onOpenFire={onOpenFire}
+                        onDeleteFires={onDeleteFires}
                         onOpenMenu={() => setScreen({ name: 'menu' })}
                     />
                 ) : null}

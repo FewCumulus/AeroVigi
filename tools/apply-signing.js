@@ -102,6 +102,32 @@ if (!props.includes('AEROVIGI_STORE_FILE')) {
 
 console.log('Signature de release appliquée.');
 
+// --- Version ----------------------------------------------------------------
+// `versionName` et `versionCode` viennent de build.gradle, figé au dernier
+// prebuild : modifier `version` dans app.json ne suffit donc pas à changer la
+// version de l'APK. On les resynchronise ici.
+//
+// `versionCode` est dérivé du numéro de version (0.1.1 → 10101) : Play exige
+// qu'il augmente strictement à chaque téléversement, et une valeur calculée
+// évite de l'oublier.
+{
+    const appJson = JSON.parse(fs.readFileSync(path.join(MOBILE, 'app.json'), 'utf8'));
+    const version = appJson.expo.version;
+    const [maj, min, pat] = version.split('.').map((n) => parseInt(n, 10) || 0);
+    const code = maj * 10000 + min * 100 + pat;
+
+    let g = fs.readFileSync(GRADLE, 'utf8');
+    const before = g;
+    g = g.replace(/versionCode\s+\d+/, `versionCode ${code}`);
+    g = g.replace(/versionName\s+"[^"]*"/, `versionName "${version}"`);
+    if (g === before && !g.includes(`versionName "${version}"`)) {
+        console.error('Impossible de fixer la version — build.gradle inattendu.');
+        process.exit(1);
+    }
+    fs.writeFileSync(GRADLE, g, 'utf8');
+    console.log(`Version fixée : ${version} (versionCode ${code}).`);
+}
+
 // --- Retrait des permissions inutilisées ------------------------------------
 if (fs.existsSync(MANIFEST)) {
     let manifest = fs.readFileSync(MANIFEST, 'utf8');

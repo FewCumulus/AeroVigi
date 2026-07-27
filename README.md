@@ -35,8 +35,17 @@ un SMS au **114** — sans couverture data.
 8. **Feux reportés sur la carte** avec l'heure du signalement. Un appui sur un
    marqueur rouvre la fiche pour un message de suivi — « arrivée de véhicules
    d'intervention » ou « le feu semble maîtrisé », ce dernier grisant le
-   marqueur. Le partage de ces feux entre pilotes viendra avec le serveur
+   marqueur. Deux commandes apparaissent alors dans la barre latérale : un
+   **œil** pour masquer les marqueurs, une **corbeille** pour effacer ceux de
+   plus de 12 h ou la totalité. Un feu isolé s'efface depuis sa propre fiche.
+   Le partage de ces feux entre pilotes viendra avec le serveur
    ([plan §5.2](docs/00-plan-produit.md)).
+9. **Lien vers la [Météo des forêts](https://meteofrance.com/meteo-des-forets)**
+   de Météo-France en tête de menu, à consulter au sol avant le vol.
+
+Le bouton retour d'Android ramène à l'écran précédent ; sur la carte, il ne fait
+rien plutôt que de fermer l'application — un geste de trop en vol
+déchargerait les tuiles.
 
 ### Le message
 
@@ -212,7 +221,7 @@ Les fichiers `src/data/*` et `src/lib/mapHtml.ts` sont **générés** — ne pas
 |---|---|
 | `node tools/build-dfci-grid.js` | `src/data/dfciGrid.ts` — la grille DFCI dérivée du shapefile officiel, vérifiée sur ses 339 264 mailles, en 11 Ko. Le shapefile source (~130 Mo) n'est pas versionné : voir l'en-tête du script pour sa provenance |
 | `node tools/build-map-html.js` | `src/lib/mapHtml.ts` — la page Leaflet embarquée (Leaflet 1.9.4 intégré, pour que la carte fonctionne sans réseau) |
-| `node tools/apply-signing.js` | correctifs du projet Android généré : signature de release, et retrait des permissions déclarées par React Native mais inutilisées ici (dont `SYSTEM_ALERT_WINDOW`). À relancer après chaque `expo prebuild` |
+| `node tools/apply-signing.js` | correctifs du projet Android généré : signature de release, report de la version d'`app.json` dans `build.gradle` (`versionName` et `versionCode`, que le prebuild seul ne met pas à jour), et retrait des permissions déclarées par React Native mais inutilisées ici (dont `SYSTEM_ALERT_WINDOW`). À relancer après chaque `expo prebuild`, et après chaque changement de version |
 | `powershell -File tools/build-icons.ps1` | les icônes de l'app, dérivées de `docs/Logo AeroVigi clean.png` (l'icône adaptative Android étant recadrée en cercle, le logo est réduit à 66 % pour tenir dans la zone garantie) |
 
 ---

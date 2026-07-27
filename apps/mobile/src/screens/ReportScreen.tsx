@@ -40,9 +40,18 @@ type Props = {
     parent?: { id: string; at: string; dfci: string | null } | null;
     onDone: (r: StoredReport) => void;
     onCancel: () => void;
+    /** Retire le marqueur de la carte (mode suivi uniquement). */
+    onDeleteFire?: (id: string) => void;
 };
 
-export function ReportScreen({ point, observer, parent, onDone, onCancel }: Props) {
+export function ReportScreen({
+    point,
+    observer,
+    parent,
+    onDone,
+    onCancel,
+    onDeleteFire,
+}: Props) {
     const insets = useSafeAreaInsets();
     const isUpdate = !!parent;
     const choices: ReportType[] = isUpdate ? UPDATE_TYPES : FIRE_TYPES;
@@ -190,6 +199,29 @@ export function ReportScreen({ point, observer, parent, onDone, onCancel }: Prop
                         {built.omitted.map((o) => `« ${o} »`).join(', ')}
                     </Text>
                 ) : null}
+
+                {isUpdate && onDeleteFire ? (
+                    <Pressable
+                        onPress={() =>
+                            Alert.alert(
+                                'Retirer ce feu de la carte',
+                                'Le marqueur et son historique disparaissent de ce téléphone. Le SMS déjà envoyé n’est pas annulé.',
+                                [
+                                    { text: 'Annuler', style: 'cancel' },
+                                    {
+                                        text: 'Retirer',
+                                        style: 'destructive',
+                                        onPress: () => onDeleteFire(parent!.id),
+                                    },
+                                ],
+                            )
+                        }
+                        hitSlop={8}
+                        style={{ marginTop: 22, alignSelf: 'center' }}
+                    >
+                        <Text style={s.deleteLink}>Retirer ce feu de la carte</Text>
+                    </Pressable>
+                ) : null}
             </ScrollView>
 
             <View style={[s.actions, { paddingBottom: Math.max(insets.bottom, 12) }]}>
@@ -286,6 +318,7 @@ const s = StyleSheet.create({
     },
     previewTxt: { fontFamily: 'monospace', fontSize: 14, color: C.text, lineHeight: 20 },
     counter: { fontSize: 12, color: C.textDim, marginTop: 6 },
+    deleteLink: { color: C.alert, fontWeight: '800', fontSize: 15 },
     actions: {
         paddingHorizontal: 12,
         paddingTop: 12,

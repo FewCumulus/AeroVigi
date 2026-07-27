@@ -11,7 +11,7 @@
  * ses coordonnées, son code DFCI et son bouton d'alerte.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { useKeepAwake } from 'expo-keep-awake';
@@ -22,7 +22,7 @@ import { Btn } from '../components/Btn';
 import { formatDD, metersToFt } from '../lib/coords';
 import { dfciFromWgs84 } from '../lib/dfci';
 import type { Fix } from '../lib/useAircraftPosition';
-import type { MappedFire } from '../lib/storage';
+import { fireIdsOlderThan, type MappedFire } from '../lib/storage';
 
 const OSM_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 
@@ -43,8 +43,12 @@ type Props = {
     openAipKey?: string;
     onPick: (p: PickedPoint) => void;
     onOpenFire: (id: string) => void;
+    onDeleteFires: (ids: string[]) => void;
     onOpenMenu: () => void;
 };
+
+/** Au-delà de cette ancienneté, un feu n'a plus d'intérêt opérationnel. */
+const OLD_FIRE_HOURS = 12;
 
 export function MapScreen({
     fix,
@@ -54,6 +58,7 @@ export function MapScreen({
     openAipKey,
     onPick,
     onOpenFire,
+    onDeleteFires,
     onOpenMenu,
 }: Props) {
     useKeepAwake();
@@ -63,6 +68,7 @@ export function MapScreen({
     const [follow, setFollow] = useState(true);
     const [pointing, setPointing] = useState(false);
     const [aip, setAip] = useState(true);
+    const [firesVisible, setFiresVisible] = useState(true);
 
     // La clé saisie dans le profil l'emporte sur celle éventuellement injectée
     // à la compilation : c'est ce qui permet de distribuer une application
@@ -106,23 +112,55 @@ export function MapScreen({
     // signalement — le pilote repasse souvent sur une zone déjà traitée.
     useEffect(() => {
         if (!ready) return;
-        const payload = fires.map((f) => ({
-            id: f.id,
-            lat: f.lat,
-            lon: f.lon,
-            label: new Date(f.at).toLocaleTimeString('fr-FR', {
-                hour: '2-digit',
-                minute: '2-digit',
-            }),
-            done: f.lastUpdate === 'maitrise',
-        }));
+        const payload = firesVisible
+            ? fires.map((f) => ({
+                  id: f.id,
+                  lat: f.lat,
+                  lon: f.lon,
+                  label: new Date(f.at).toLocaleTimeString('fr-FR', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                  }),
+                  done: f.lastUpdate === 'maitrise',
+              }))
+            : [];
         send(`window.VA && window.VA.setFires(${JSON.stringify(payload)});`);
-    }, [ready, fires]);
+    }, [ready, fires, firesVisible]);
 
     const dfci = fix ? dfciFromWgs84(fix.lat, fix.lon) : null;
     const alt = metersToFt(fix?.altitudeM);
     const ageS = fix ? Math.round((Date.now() - fix.at.getTime()) / 1000) : null;
     const stale = ageS != null && ageS > 10;
+
+    /**
+     * Suppression des marqueurs. Deux cas d'usage distincts : effacer un vieux
+     * fond de carte encombré, et rattraper une fausse manœuvre. Le libellé dit
+     * explicitement que les SMS déjà partis ne sont pas concernés — c'est la
+     * confusion à éviter absolument sur un outil d'alerte.
+     */
+    const confirmDelete = () => {
+        const oldIds = fireIdsOlderThan(fires, OLD_FIRE_HOURS);
+        const options: Array<{ text: string; onPress?: () => void; style?: 'cancel' | 'destructive' }> =
+            [];
+        if (oldIds.length) {
+            options.push({
+                text: `Effacer ceux de plus de ${OLD_FIRE_HOURS} h (${oldIds.length})`,
+                onPress: () => onDeleteFires(oldIds),
+            });
+        }
+        options.push({
+            text: `Tout effacer (${fires.length})`,
+            style: 'destructive',
+            onPress: () => onDeleteFires(fires.map((f) => f.id)),
+        });
+        options.push({ text: 'Annuler', style: 'cancel' });
+
+        Alert.alert(
+            'Effacer les marqueurs',
+            'Retire les feux de la carte de ce téléphone. Les SMS déjà envoyés ne sont pas annulés.\n\nPour ne supprimer qu’un feu, appuyez dessus sur la carte.',
+            options,
+        );
+    };
 
     const verticalMark = () => {
         // Lecture du point à l'instant de l'appui — voir useAircraftPosition.
@@ -216,6 +254,19 @@ export function MapScreen({
                 {/* L'effet ci-dessus applique le changement : le bouton ne fait
                     que basculer l'état, il n'y a pas deux chemins de code. */}
                 <SideBtn label="AIP" active={aip && !!aipUrl} onPress={() => setAip(!aip)} />
+                {/* Œil et corbeille n'apparaissent que s'il y a des feux à
+                    masquer ou à effacer : la barre reste courte en usage normal. */}
+                {fires.length > 0 ? (
+                    <>
+                        <SideBtn
+                            label="👁"
+                            active={firesVisible}
+                            struck={!firesVisible}
+                            onPress={() => setFiresVisible((v) => !v)}
+                        />
+                        <SideBtn label="🗑" onPress={confirmDelete} />
+                    </>
+                ) : null}
                 <SideBtn label="+" onPress={() => send('window.VA && window.VA.zoom(1);')} />
                 <SideBtn label="–" onPress={() => send('window.VA && window.VA.zoom(-1);')} />
             </View>
@@ -276,10 +327,13 @@ function SideBtn({
     label,
     onPress,
     active,
+    struck,
 }: {
     label: string;
     onPress: () => void;
     active?: boolean;
+    /** Barre oblique sur l'icône — l'œil « fermé » des marqueurs masqués. */
+    struck?: boolean;
 }) {
     return (
         <Pressable
@@ -290,6 +344,7 @@ function SideBtn({
             ]}
         >
             <Text style={[s.sideTxt, { color: active ? C.white : C.text }]}>{label}</Text>
+            {struck ? <View style={s.strike} /> : null}
         </Pressable>
     );
 }
@@ -325,7 +380,9 @@ const s = StyleSheet.create({
         justifyContent: 'center',
     },
     menuTxt: { fontSize: 22, color: C.text },
-    side: { position: 'absolute', right: 8, top: '38%', gap: 8 },
+    // Remontée pour absorber les deux boutons supplémentaires (œil, corbeille)
+    // sans venir buter sur les commandes du bas.
+    side: { position: 'absolute', right: 8, top: '24%', gap: 8 },
     sideBtn: {
         width: 52,
         height: 52,
@@ -334,6 +391,14 @@ const s = StyleSheet.create({
         justifyContent: 'center',
     },
     sideTxt: { fontSize: 18, fontWeight: '800' },
+    strike: {
+        position: 'absolute',
+        width: 40,
+        height: 3,
+        borderRadius: 2,
+        backgroundColor: C.alert,
+        transform: [{ rotate: '-45deg' }],
+    },
     // `bottom` est calculé à partir des marges système (barre de gestes ou
     // barre à trois boutons selon l'appareil).
     bottom: { position: 'absolute', left: 12, right: 12 },

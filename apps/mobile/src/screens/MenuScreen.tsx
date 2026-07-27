@@ -4,12 +4,14 @@
  * le premier n'est pas parti, et rendre compte a posteriori à l'association
  * ou au SDIS.
  */
-import { View, Text, StyleSheet, ScrollView, Pressable, Share } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, Share, Linking } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Btn } from '../components/Btn';
 import { C } from '../lib/theme';
 import { REPORT_TYPE_UI } from '../lib/message';
 import type { StoredReport } from '../lib/storage';
+
+const METEO_DES_FORETS = 'https://meteofrance.com/meteo-des-forets';
 
 export function MenuScreen({
     reports,
@@ -30,7 +32,25 @@ export function MenuScreen({
             <ScrollView contentContainerStyle={s.scroll}>
                 <Text style={s.h1}>AeroVigi</Text>
 
-                <Btn label="Profil observateur" variant="secondary" onPress={onProfile} />
+                {/* Consultation au sol, avant le vol : le niveau de danger du
+                    jour conditionne l'intérêt d'une patrouille. Ouvre le
+                    navigateur, l'application n'embarque pas ce contenu. */}
+                <Btn
+                    label="Météo des forêts  ↗"
+                    variant="secondary"
+                    onPress={() => void Linking.openURL(METEO_DES_FORETS)}
+                />
+                <Text style={s.linkHelp}>
+                    Carte de vigilance feux de forêt de Météo-France, ouverte dans votre
+                    navigateur.
+                </Text>
+
+                <Btn
+                    label="Profil observateur"
+                    variant="secondary"
+                    onPress={onProfile}
+                    style={{ marginTop: 8 }}
+                />
                 <Btn
                     label="Conditions d’utilisation"
                     variant="secondary"
@@ -90,6 +110,7 @@ const s = StyleSheet.create({
     h1: { fontSize: 26, fontWeight: '900', color: C.text, marginBottom: 16 },
     h2: { fontSize: 13, fontWeight: '800', color: C.textDim, marginTop: 26, marginBottom: 10, textTransform: 'uppercase' },
     empty: { color: C.textDim, fontSize: 14 },
+    linkHelp: { fontSize: 12, color: C.textDim, marginTop: 6, marginBottom: 4, lineHeight: 16 },
     item: {
         backgroundColor: C.white,
         borderRadius: 12,
