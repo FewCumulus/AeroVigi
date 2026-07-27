@@ -1,233 +1,191 @@
 # VigiAero — Plan produit & technique
 
 > Application mobile (Expo / React Native) permettant aux pilotes privés en vol de faire de
-> la vigilance feux de forêt : alerte d'urgence en un geste, et planification/déconfliction
-> des vols d'observation.
+> la vigilance feux de forêt : alerte en un geste, et — à venir — partage des feux signalés
+> et planification des vols d'observation.
 >
-> Rédigé le 26/07/2026. Cible initiale : Android (France), puis iOS, puis Espagne.
->
-> **Mise à jour du 26/07/2026 au soir** — le MVP de la fonction F1 est construit
-> et compilé en APK. Décisions arrêtées par le porteur du projet, qui assume la
-> responsabilité juridique à ce stade : destination **114** seule, **pas** de
-> lien Google Maps (l'alerte doit partir sans couverture data), **pas** de
-> référentiel communes — les CODIS travaillent au **carroyage DFCI**, complété
-> des degrés décimaux. Voir [README](../README.md) pour l'état livré, et §4.2
-> ci-dessous pour le format de message effectivement retenu.
+> Cible initiale : Android (France), puis iOS, puis Espagne.
+> État au 27/07/2026 : **F1 livrée** (voir [README](../README.md)), F2 à faire.
 
 ---
 
 ## 1. Périmètre
 
-| # | Fonction | Phase |
+| # | Fonction | État |
 |---|---|---|
-| F1 | Alerte feu en un geste → SMS pré-rempli vers le 114 (FR) | MVP |
-| F2 | Planification de vol + zones d'observation partagées + déconfliction | V2 |
-| F3 | Extension Espagne (i18n `es`, routage 112 régional, API My112 si accord) | V3 |
-| F4 | iOS, cartes hors-ligne, export post-vol vers SDIS/association | V4 |
+| F1 | Alerte feu en un geste → SMS pré-rempli au 114 | **livrée** |
+| F2 | Feux partagés entre pilotes + planification et déconfliction des vols | à faire |
+| F3 | Extension Espagne (i18n `es`, routage 112 régional) | à faire |
+| F4 | iOS, cartes hors ligne, export post-vol | à faire |
 
 **Hors périmètre explicite** : détection automatique de feu, remplacement d'un moyen
 d'alerte officiel, coordination opérationnelle des moyens de lutte.
 
 ---
 
-## 2. Points bloquants à valider AVANT d'écrire du code
+## 2. Contraintes structurantes
 
-Ces trois points conditionnent la viabilité de F1. Ils sont d'ordre juridique/conventionnel,
-pas technique — mais ils peuvent changer la cible du message.
+Trois contraintes déterminent la forme de l'application. Elles sont techniques : aucune
+n'est contournable par un choix d'implémentation.
 
-### 2.1 Le 114 n'est pas un canal SMS d'urgence généraliste ⚠️
+### 2.1 L'envoi de SMS par programme est impossible
 
-Le 114 est le numéro d'urgence **réservé aux personnes sourdes, malentendantes,
-sourdaveugles, aphasiques et dysphasiques** — c'est-à-dire aux personnes en difficulté
-pour entendre ou parler. Il est également ouvert aux personnes en incapacité momentanée de
-parler (aphasie soudaine, panique extrême post-accident). Ce n'est pas, en l'état, un canal
-« SMS vers les secours » ouvert à tous.
+- **Android** : la permission `SEND_SMS` (envoi silencieux) est réservée par la politique
+  du Play Store aux applications de messagerie par défaut. Une application tierce qui la
+  demande est rejetée.
+- **iOS** : aucun envoi par programme, quelle que soit la configuration.
 
-Un pilote en vol n'entre pas dans la cible officielle du service. Envoyer massivement des
-signalements de feux au 114 sans accord préalable, c'est :
-- risquer de saturer un service dimensionné pour un public spécifique ;
-- risquer un rejet/blocage du service, donc une alerte qui n'arrive pas.
+Le « un geste » réel est donc : **1 appui dans VigiAero → la fenêtre SMS du système s'ouvre
+pré-remplie (destinataire et texte) → 1 appui sur Envoyer**. Le second geste est imposé par
+les magasins ; il fait aussi office de sécurité anti-fausse-alerte.
 
-**Actions préalables (Phase 0)** :
-1. Écrire au **CNR 114** (Centre National de Relais, CHU Grenoble) pour exposer le cas
-   d'usage « pilote en vol, cabine bruyante, appel vocal impossible » et demander un avis
-   écrit. Un pilote au casque, moteur en marche, ne *peut pas* physiquement tenir une
-   conversation téléphonique — c'est l'argument central.
-2. En parallèle, ouvrir une **convention avec un ou deux SDIS pilotes** (départements à
-   risque : 13, 83, 84, 06, 34, 30, 66, 2A/2B). Un CODIS peut fournir un numéro de portable
-   de salle opérationnelle acceptant les SMS — c'est souvent la voie la plus rapide et la
-   plus fiable.
-3. Rapprochement **FFA / fédération** et associations existantes de guet aérien bénévole
-   pour capitaliser sur les conventions déjà signées.
+Ce que le SMS apporte en échange : il part sans données mobiles, sur un réseau dégradé, et
+la réponse du destinataire arrive sur le numéro du pilote — un dialogue reste possible. Un
+relais serveur (l'application envoie à un serveur qui envoie le SMS) casserait ce dialogue :
+écarté comme canal principal.
 
-**Conséquence d'architecture** : le destinataire de l'alerte ne doit **jamais** être codé en
-dur. Voir §5.3 (« canaux d'alerte » configurables par zone géographique).
+### 2.2 Hors ligne d'abord
 
-### 2.2 Usage du téléphone en vol
+La couverture réseau est aléatoire en altitude. Tout ce qui conditionne l'alerte fonctionne
+donc sans réseau : calcul du carroyage DFCI, formatage du message, composeur SMS. Seules les
+tuiles de la carte demandent une connexion.
 
-L'usage du réseau mobile à bord d'un aéronef en vol est encadré (mode avion attendu, et
-la couverture réseau est de toute façon aléatoire en altitude). Deux conséquences produit :
+Conséquence de conception : le bandeau de position et le bouton d'alerte sont des composants
+natifs **posés au-dessus** de la carte, jamais dans la page web. Si la carte ne charge pas,
+le pilote garde ses coordonnées, son code DFCI et son bouton. La carte n'est par ailleurs
+jamais démontée une fois chargée — les autres écrans se superposent — pour qu'un
+signalement fait hors couverture ne fasse pas perdre les tuiles déjà affichées.
 
-- Le message doit pouvoir être **composé hors ligne**, mis en file d'attente, et parti dès
-  que le réseau revient — avec un état visuel non ambigu (`EN ATTENTE RÉSEAU` / `ENVOYÉ`).
-- L'app doit rappeler dans son onboarding que **la voie primaire de signalement en vol
-  reste la radio** (FIS / organisme ATC en contact) et que le SMS est un complément
-  fournissant les coordonnées exactes, pas un substitut.
+### 2.3 Le destinataire n'est pas figé
 
-À faire valider par l'assurance de l'association / le club porteur.
-
-### 2.3 Envoi SMS programmatique impossible sur les stores
-
-- **Android** : la permission `SEND_SMS` (envoi silencieux) est réservée par la Play Store
-  policy aux applications SMS par défaut. Une app tierce qui la demande est rejetée.
-- **iOS** : aucun envoi SMS programmatique, quelle que soit la configuration.
-
-⇒ Le « un clic » réel est : **1 appui dans VigiAero → la fenêtre SMS native s'ouvre
-pré-remplie (destinataire + texte) → 1 appui sur Envoyer**. Deux gestes, dont le second est
-imposé par les stores. C'est aussi une sécurité anti-fausse-alerte, donc ce n'est pas un
-mauvais compromis — mais il faut le concevoir ainsi dès le départ (module `expo-sms`).
-
-**Avantage à conserver** : le SMS fonctionne sans data, sur du réseau dégradé, et la réponse
-du 114/CODIS arrive sur le numéro du pilote → dialogue possible. Un relais serveur (l'app
-envoie à un backend qui envoie le SMS) casserait ce dialogue : à écarter comme canal
-primaire, à garder comme canal de secours/duplication.
+Un numéro de salle opérationnelle peut changer, et l'extension à l'Espagne suppose plusieurs
+destinataires régionaux. La destination est aujourd'hui une constante unique
+(`DESTINATION` dans `src/screens/ReportScreen.tsx`) ; l'abstraction prévue est décrite en
+§4.4.
 
 ---
 
-## 3. Architecture générale
-
-Dépôt autonome (VigiAero n'est pas un module Cumulus), mais qui **réutilise les briques
-éprouvées de Cumulus** — notamment toute la mécanique carte.
+## 3. Architecture
 
 ```
 VigiAero/
-├── apps/mobile/          # Expo SDK 57 / RN 0.86 / expo-router / NativeWind / zustand
-│   ├── app/              # routes : (tabs)/carte, (tabs)/plan, (tabs)/historique, profil
-│   ├── assets/map/       # map.html + leaflet (bundlé, fonctionne hors ligne)
-│   └── src/{components,lib,api,stores,db}
-├── backend/              # NestJS 11 + PostgreSQL 16 + PostGIS (F2 uniquement)
-├── shared/               # types + formatage coordonnées + template message (testés)
-└── docs/
+├── apps/mobile/            # Expo SDK 57, React Native 0.86, TypeScript
+│   ├── App.tsx             # machine à états à cinq écrans (pas de routeur)
+│   ├── assets/             # icônes générées
+│   └── src/
+│       ├── components/     # Btn
+│       ├── data/           # dfciGrid.ts (généré)
+│       ├── lib/            # dfci, coords, message, storage, mapHtml (généré), theme…
+│       └── screens/        # Map, Report, Advice, Profile, Menu, Disclaimer
+├── docs/
+└── tools/                  # générateurs et vérifications (Node, sans dépendances)
 ```
 
-**Pourquoi ce stack** : strictement celui de Cumulus (Expo 57, expo-router, NativeWind,
-react-query, zustand, NestJS/TypeORM/Postgres). Zéro coût d'apprentissage, patterns et
-composants (`Button`, `Text`, `TextInput`, `theme.ts`) directement transposables, et
-déploiement possible sur l'infra Scaleway existante avec une base séparée.
+Choix volontaires, motivés par le délai de mise en service et par la fiabilité :
 
-### 3.1 La carte — réutilisation directe de l'ops map Cumulus
+- **pas de routeur** — cinq écrans, aucune URL à partager, une chaîne d'outils en moins ;
+- **pas de framework de style** — `StyleSheet` seul ;
+- **aucune dépendance de production hors Expo** : `expo-location`, `expo-sms`,
+  `expo-keep-awake`, `react-native-webview`, `react-native-safe-area-context`,
+  AsyncStorage ;
+- **tests en Node pur**, sans lanceur de tests (voir §4.5).
 
-L'ops map Cumulus n'est pas du natif : c'est **Leaflet dans une WebView**
-(`apps/mobile/src/components/inflight/OpsMapTab.tsx`), pointant sur la route SPA
-`/m/inflight-map`. Pour VigiAero on garde le principe mais on **embarque le HTML dans
-l'app** (pas de dépendance au serveur Cumulus, fonctionne hors ligne, pas d'auth à injecter).
+### 3.1 La carte
 
-Fichiers Cumulus à copier/adapter :
+Leaflet dans une WebView, la page HTML étant **embarquée dans l'application** — Leaflet
+compris — plutôt que chargée depuis un serveur : l'interface reste utilisable sans réseau, et
+il n'y a ni dépendance externe ni authentification à injecter.
 
-| Source Cumulus | Usage VigiAero |
-|---|---|
-| `apps/mobile/src/lib/webShell.ts` → `NATIVE_GEOLOCATION_SHIM`, `ANTI_FLICKER_JS` | Le shim geoloc est **indispensable** : l'API Geolocation d'une WebView sur origine locale/http est bloquée ; la position vient d'`expo-location` et est injectée. L'anti-flicker règle le clignotement des tuiles au pinch-zoom Android. |
-| `apps/mobile/src/lib/useWebViewGeolocation.ts` | Pont GPS natif → WebView, avec rejeu du dernier fix au `onLoadEnd`. |
-| `frontend/src/lib/mapTiles.ts` | URLs fond de carte OSM (clair) / CartoDB dark + attributions. |
-| `backend/src/preflight/pre-flight.service.ts:1214` | URL du **calque raster OpenAIP** déjà utilisée : `https://{s}.api.tiles.openaip.net/api/data/openaip/{z}/{x}/{y}.png?apiKey=…` |
+Couches, volontairement minimales :
 
-**Couches VigiAero (volontairement minimales)** :
-1. Fond OSM (clair) / CartoDB Dark Matter (nuit).
-2. **Un seul calque OpenAIP raster** en overlay — conformément à la demande : pas de
-   polygones GeoJSON, pas de filtrage 3D par limites verticales. On n'utilise donc **pas**
-   `frontend/src/lib/openaipAirspacesLayer.ts` (rendu vectoriel canvas avec filtres
-   d'altitude), qui est plus lourd et sans intérêt ici.
-3. Position propre (avion) + trace.
-4. Marqueurs de feux signalés (session locale + partagés en V2).
-5. En V2 : routes et zones d'observation des autres vols planifiés.
+1. fond OpenStreetMap ;
+2. **un seul calque raster OpenAIP** en surcouche — pas de polygones GeoJSON, pas de
+   filtrage par limites verticales ;
+3. position de l'avion, orientée ;
+4. marqueurs des feux signalés, avec l'heure.
 
-⚠️ La clé API OpenAIP est actuellement **en dur dans le dépôt Cumulus**. Pour VigiAero :
-clé dédiée, passée par `app.config.ts` / variable EAS, et rotation de la clé Cumulus à
-prévoir (à signaler côté Cumulus).
+La WebView n'ayant pas accès à l'API Geolocation sur une origine locale, la position est
+poussée depuis le natif (`expo-location`) par injection de script. Les panneaux de tuiles
+sont forcés sur leur propre couche GPU, faute de quoi elles clignotent au pinch-zoom sur
+Android.
 
-**Hors ligne** : prévoir dès la conception un `TileLayer` custom lisant d'abord un cache
-disque (`expo-file-system`), alimenté par un pré-téléchargement de zone choisie au sol
-(« préparer ma zone »). Implémentation en Phase 4, mais l'abstraction dès la Phase 1.
+**Hors ligne (à faire)** : un `TileLayer` lisant d'abord un cache disque
+(`expo-file-system`), alimenté par un pré-téléchargement de zone au sol.
 
 ---
 
 ## 4. F1 — Alerte feu
 
-### 4.1 Parcours utilisateur
+### 4.1 Parcours
 
 Écran carte, en vol, plein soleil, une main disponible :
 
-- **Bouton « MARQUE VERTICALE »** (gros, en bas, pouce droit) : capture le fix GPS **à
-  l'instant de l'appui** (horodaté), c'est-à-dire la position de l'avion à la verticale du
-  feu. À 100 kt on parcourt ~50 m/s : le fix doit être pris sur l'événement `onPressIn`, pas
-  après le rendu de l'écran suivant.
-- **Ou appui long sur la carte** : extraction des coordonnées du point pointé (bridge
-  `postMessage` WebView → natif). Utile quand on ne peut pas survoler à la verticale.
-- Écran de confirmation en **une page, 4 champs pré-remplis** :
-  - Type : `FEU DE FORÊT` / `FEU DE VÉGÉTATION` / `FEU DE BÂTIMENT` / `FUMÉE, ORIGINE
-    INDÉTERMINÉE` (4 gros boutons, sélection = 1 appui) ;
-  - Ampleur estimée (optionnel, 3 boutons : `DÉBUTANT` / `EN COURS` / `IMPORTANT`) ;
-  - Position (modifiable, affichée dans les 3 formats) ;
-  - Identité pilote/avion/fréquence (issue du profil, jamais à ressaisir).
-- **Bouton ENVOYER** → ouverture du composeur SMS natif pré-rempli → appui « Envoyer ».
-- Retour dans l'app : la fiche passe en `TRANSMIS` et est archivée dans l'historique local.
+- **MARQUE VERTICALE** : capture le point GPS **à l'instant de l'appui**, c'est-à-dire la
+  position de l'avion à la verticale du feu. À 100 kt on parcourt 50 m par seconde : le point
+  est lu dans une `ref` alimentée en continu, sans attendre un rendu.
+- **Pointer sur la carte** : réticule fixe au centre, on déplace la carte dessous et on
+  valide. Plus praticable qu'un appui précis en turbulence.
+- **Écran de confirmation**, tout pré-rempli : nature du feu (4 choix), ampleur
+  (facultative), **intention** — « je reste sur zone » / « je poursuis ma route » —, et le
+  texte exact qui partira avec son décompte de caractères.
+- **Envoi** → composeur SMS du système, pré-rempli.
+- **Consignes** au retour : maintenir 3 000 ft au-dessus du feu, transmettre les coordonnées
+  et le DFCI à l'organisme de contrôle ou à Info FIR par radio, quitter la zone à l'arrivée
+  des moyens aériens. La position y figure en gros caractères, pour la lecture radio.
+- Le feu est reporté sur la carte avec son heure ; un appui rouvre la fiche pour un message
+  de suivi (« véhicules d'intervention sur place », « feu semble maîtrisé »).
 
-Ergonomie : mode « cockpit » (police large, contraste élevé, cibles tactiles ≥ 60 dp,
-écran maintenu allumé, pas de dialogue modal fermable par erreur), verrouillage anti-appui
-accidentel (appui maintenu 0,5 s sur le bouton d'alerte).
+Ergonomie : police large, contraste élevé, cibles tactiles ≥ 60 dp, écran maintenu allumé.
 
 ### 4.2 Contenu du message
 
-Le message doit être **exploitable par un opérateur de CODIS**. Trois exigences qui priment
-sur l'exhaustivité :
+Le message doit être exploitable par un opérateur de CODIS. Trois exigences priment sur
+l'exhaustivité :
 
-1. Le **carroyage DFCI** d'abord. C'est le référentiel de travail des CODIS pour les feux
-   de forêt ; les degrés décimaux viennent en complément (et servent à tout autre
-   destinataire). Ni degrés-minutes ni degrés-minutes-secondes : ils n'apportent rien ici
-   et coûtent des caractères.
+1. Le **carroyage DFCI** d'abord — c'est le référentiel de travail des CODIS pour les feux de
+   forêt ; les degrés décimaux viennent en complément. Ni degrés-minutes ni
+   degrés-minutes-secondes : ils n'apportent rien ici et coûtent des caractères.
 2. La **contrainte des 160 caractères** : au-delà, le SMS est découpé en segments dont le
    réassemblage et l'ordre d'arrivée ne sont pas garantis chez le destinataire.
-   ⇒ **un seul segment**, garanti par construction (voir plus bas).
-3. **ASCII strict** : un seul caractère hors GSM-7 (é, °, ') fait basculer le SMS en UCS-2
-   et **réduit le segment à 70 caractères**.
-
-**Message livré**
+3. **ASCII strict** : un seul caractère hors GSM-7 (é, °, ') fait basculer le message en
+   UCS-2 et réduit le segment à 70 caractères.
 
 ```
 FEU DE FORET IMPORTANT vu d avion
 DFCI KD44F0
 43.52970N 005.44740E
-S.BESNIER F-GXYZ radio 123.500
+JO PILOTE F-GXYZ radio 123.500
 1432UTC 3500ft GPS
-En vol, ne peux pas parler
+Je reste sur zone
+Appel vocal impossible
 ```
-143 caractères, 1 segment.
+157 caractères, 1 segment.
 
 **Garantie du segment unique** : le message est assemblé par priorité. Les lignes
-essentielles — nature du feu, DFCI, degrés décimaux, identité, heure — partent toujours ;
-les lignes de confort (« point relevé sur carte », « en vol, ne peux pas parler ») ne sont
-ajoutées que tant que le total reste sous 160 caractères, et l'écran de confirmation
-affiche ce qui a été écarté. Un nom d'observateur long ne peut donc pas transformer
-l'alerte en deux SMS.
+essentielles — nature, DFCI, degrés décimaux, identité, heure — partent toujours ; les lignes
+de confort (intention, mention « appel vocal impossible ») ne sont ajoutées que tant que le
+total tient en un segment, et l'écran affiche ce qui a été écarté. Un nom d'observateur long
+ne peut donc pas transformer l'alerte en deux SMS.
 
-**Le carroyage DFCI, hors ligne.** Le shapefile officiel `CARRO_DFCI_2X2_L93`
-(339 264 mailles) est trop lourd à embarquer, et coder à la main la chaîne
-WGS84 → NTF → Lambert II étendu, c'est trois occasions de se tromper de paramètre de datum
-sans le voir. La grille est donc **dérivée du fichier source** : la reprojection
-conique→conique étant conforme, elle se ramène à une similitude sur l'emprise d'un carré de
-100 km, et l'on ajuste par moindres carrés une affine par carré. Résultat : **11 Ko
-embarqués**, résidu maximal 4,47 m pour une maille de 2 000 m, et les 339 264 mailles du
-fichier reconstruites à l'identique. Vérification rejouable : `node tools/test-dfci.js`.
+L'altitude est annoncée `GPS` : le récepteur la rapporte à l'ellipsoïde, l'écart avec
+l'altitude barométrique atteint 150 ft en France. C'est une hauteur d'observation, pas une
+altitude de vol.
 
-**Champs du modèle de données** (`src/lib/storage.ts`) :
-`at`, `lat`, `lon`, `altitudeM`, `fireType`, `severity`, `source` (verticale ou pointage
-carte), `dfci`, `text`, `state`.
+### 4.3 Le carroyage DFCI, hors ligne
 
-**Décision prise** : pas de lien Google Maps dans le SMS. Il suppose une data au CODIS et
-coûterait un tiers de segment, alors que l'exigence première est de pouvoir alerter sans
-couverture data.
+Le fichier officiel `CARRO_DFCI_2X2_L93` compte 339 264 mailles : trop lourd à embarquer. Et
+coder à la main la chaîne WGS84 → NTF → Lambert II étendu, c'est trois occasions de se
+tromper de paramètre de datum sans le voir.
 
-### 4.3 Canaux d'alerte (abstraction centrale)
+La grille est donc **dérivée du fichier source**. La reprojection conique → conique étant
+conforme, elle se ramène à une similitude sur l'emprise d'un carré de 100 km : on ajuste par
+moindres carrés une transformation affine par carré. Résultat : **11 Ko embarqués**, résidu
+maximal 4,47 m pour une maille de 2 000 m, et les 339 264 mailles du fichier reconstruites à
+l'identique.
+
+Reproductible : `node tools/build-dfci-grid.js`, vérifiable par `node tools/test-dfci.js`.
+
+### 4.4 Canaux d'alerte (prévu)
 
 ```ts
 type AlertChannel = {
@@ -235,57 +193,63 @@ type AlertChannel = {
   label: string;
   country: 'FR' | 'ES';
   bbox?: GeoJSON.BBox;           // zone de compétence
-  transport: 'sms' | 'voice' | 'api' | 'relay';
-  recipient: string;             // '114', '+33…', endpoint
+  transport: 'sms' | 'voice' | 'api';
+  recipient: string;             // '114', '+33…', point d'entrée
   template: 'fr-compact' | 'es-compact' | …;
-  maxSegments: number;
 };
 ```
 
-Table livrée avec l'app, **rafraîchissable depuis le backend** sans mise à jour store
-(important : un numéro de CODIS peut changer). Sélection automatique par position, avec
-surcharge manuelle. Toujours afficher en clair « Alerte envoyée à : … » avant l'envoi.
+Table livrée avec l'application et **rafraîchissable depuis le serveur** sans mise à jour du
+magasin. Sélection automatique par position, surcharge manuelle possible, et affichage en
+clair du destinataire avant l'envoi.
 
-Canal « **secours vocal** » : bouton d'appel direct 112/18 toujours visible, car c'est la
-procédure de référence dès que le pilote est au sol ou peut parler.
+Un **appel direct au 18 ou au 112** reste accessible à tout moment : c'est la procédure de
+référence dès que le pilote peut parler.
 
-### 4.4 Tests critiques
+### 4.5 Vérifications
 
-Le formatage des coordonnées et la génération du message sont du **code sûreté** : couverture
-unitaire à 100 % dans `shared/`, incluant hémisphère sud, longitudes ouest, passage
-59,999′, arrondis DMS, plafonnement 160/70 caractères, absence de caractères non GSM-7.
+Le calcul de position et la génération du message décident de l'endroit où les secours vont
+chercher. Ils sont couverts par deux vérifications rejouables, écrites en Node pur :
+
+- `tools/test-dfci.js` — invariants de la projection Lambert 93, aller-retours
+  WGS84 ↔ L93, puis 40 000 mailles tirées au sort dans le fichier officiel, converties de
+  bout en bout et comparées à leur code réel ;
+- `tools/test-message.js` — degrés décimaux (hémisphère sud, longitudes ouest, arrondis),
+  réduction à l'ASCII, segmentation GSM-7 / UCS-2, garantie du segment unique y compris avec
+  un nom d'observateur long.
 
 ---
 
-## 5. F2 — Planification & déconfliction
+## 5. F2 — Feux partagés & planification
 
 ### 5.1 Besoin
 
-Un pilote prépare son vol la veille : il veut voir **qui survole quoi, et quand**, pour
-choisir une route et des zones que personne ne couvre sur son créneau.
+Deux besoins distincts, servis par le même serveur :
 
-### 5.2 Modèle de données (PostgreSQL + PostGIS)
+- **en vol** : voir les feux déjà signalés par d'autres pilotes ;
+- **au sol** : préparer un vol en voyant qui survole quoi, et quand, pour choisir une route
+  et des zones que personne ne couvre sur son créneau.
 
-### 5.1 bis — Feux partagés (demandé le 27/07/2026)
+### 5.2 Feux partagés
 
-Les feux signalés sont déjà reportés sur la carte du téléphone qui les a émis, avec l'heure
-du signalement, et un appui sur le marqueur rouvre la fiche pour un message de suivi. La
-suite consiste à **remonter ces alertes au serveur pour les rendre visibles par tous les
-utilisateurs**, avec date et heure.
+Les feux signalés sont déjà reportés sur la carte du téléphone qui les a émis, avec l'heure,
+et un appui sur le marqueur permet un message de suivi. La suite consiste à **remonter ces
+alertes au serveur pour les rendre visibles par tous les utilisateurs**, avec date et heure.
 
-Ce que cela apporte, au-delà du confort : un pilote qui arrive sur zone voit qu'un feu est
-déjà signalé et **n'envoie pas un doublon au 114**. C'est l'argument le plus solide à
-présenter aux services de secours.
+Au-delà du confort : un pilote qui arrive sur zone voit qu'un feu est déjà signalé et
+**n'envoie pas un doublon**. C'est l'argument le plus solide à présenter aux services de
+secours.
 
 Points à trancher au moment de le faire :
-- **durée de vie d'un marqueur** : un feu signalé à 14 h n'a plus d'intérêt le lendemain ;
-  proposer une extinction automatique (par exemple 12 h) plus l'état « maîtrisé » ;
-- **confiance** : n'importe qui pouvant poser un marqueur, prévoir au minimum un compte
-  identifié et la possibilité pour un coordinateur de retirer un signalement erroné ;
-- **hors ligne** : la remontée doit être différée et rejouée, jamais bloquante pour
-  l'alerte SMS elle-même.
 
-### 5.2 Modèle de données
+- **durée de vie d'un marqueur** — un feu signalé à 14 h n'a plus d'intérêt le lendemain :
+  extinction automatique (12 h par exemple) en plus de l'état « maîtrisé » ;
+- **confiance** — n'importe qui pouvant poser un marqueur, prévoir au minimum un compte
+  identifié et la possibilité pour un coordinateur de retirer un signalement erroné ;
+- **hors ligne** — la remontée doit être différée et rejouée, jamais bloquante pour l'alerte
+  SMS elle-même.
+
+### 5.3 Modèle de données (PostgreSQL + PostGIS)
 
 ```
 pilot(id, name, email, phone, org_id, …)
@@ -295,108 +259,93 @@ mission(id, pilot_id, aircraft_id, dep_aerodrome, window tstzrange,
 mission_leg(mission_id, seq, geom LINESTRING, eta_start, eta_end, alt_ft)
 observation_zone(id, mission_id, geom POLYGON, window tstzrange, label)
 fire_report(id, pilot_id, mission_id?, geom POINT, fire_type, severity,
-            reported_at, channel_used, delivery_state)
+            reported_at, parent_id?, state)
 ```
 
-- Index GiST sur toutes les géométries + `tstzrange` ; le conflit = `ST_Intersects(a,b)
-  AND a.window && b.window`.
-- Couverture / trous : grille H3 (résolution 6 ≈ 36 km²) sur la région ; une cellule est
-  « couverte » si une zone d'observation active l'intersecte sur la fenêtre demandée.
+- Index GiST sur les géométries et les `tstzrange` ; conflit =
+  `ST_Intersects(a, b) AND a.window && b.window`.
+- Couverture et trous : grille H3 (résolution 6 ≈ 36 km²) ; une cellule est couverte si une
+  zone d'observation active l'intersecte sur la fenêtre demandée.
 
-### 5.3 Relais de tuiles OpenAIP
+### 5.4 Relais de tuiles OpenAIP
 
-À prévoir en même temps que le serveur, pour la mise en accès libre (voir README, section
-« Clé OpenAIP ») : un point d'entrée `/tiles/openaip/{z}/{x}/{y}.png` qui détient la clé et
-relaie la requête. C'est la seule façon de ne pas diffuser la clé avec l'application. Un
-cache disque devant le relais réduit fortement le trafic sortant — les pilotes d'une même
-région demandent les mêmes tuiles.
+Un point d'entrée `/tiles/openaip/{z}/{x}/{y}.png` détenant la clé et relayant la requête,
+de sorte que l'application n'ait pas besoin d'en connaître une. Un cache disque devant le
+relais réduit fortement le trafic sortant : les pilotes d'une même région demandent les
+mêmes tuiles.
 
-### 5.4 API
+### 5.5 API
 
 | Méthode | Route | Rôle |
 |---|---|---|
-| `GET` | `/missions?bbox&from&to` | Missions des autres (lecture régionale) |
+| `GET` | `/fires?bbox&since` | Feux signalés, visibles par tous |
+| `POST` | `/fires` | Remontée d'un signalement (après envoi du SMS) |
+| `GET` | `/missions?bbox&from&to` | Missions des autres pilotes |
+| `POST` | `/missions` | Dépôt d'un plan (route, zones, créneaux) |
+| `PATCH` | `/missions/:id` | Décalage, annulation, statut « en vol » |
 | `GET` | `/coverage?bbox&from&to&res` | Cellules couvertes / non couvertes |
-| `POST` | `/missions` | Dépôt d'un plan (route + zones + créneaux) |
-| `PATCH` | `/missions/:id` | Décalage horaire, annulation, statut « en vol » |
-| `POST` | `/fire-reports` | Journalisation du signalement (après envoi SMS) |
-| `GET` | `/alert-channels` | Table des canaux, versionnée |
+| `GET` | `/alert-channels` | Table des canaux, versionnée (§4.4) |
 
-Auth JWT (email + mot de passe, ou lien magique), rôles `pilot` / `coordinator`
-(association, SDIS invité) / `admin`.
+Authentification par jeton (courriel + mot de passe, ou lien à usage unique), rôles `pilot` /
+`coordinator` / `admin`.
 
-### 5.5 UX de planification
+### 5.6 UX de planification
 
-- Carte + **curseur temporel** (slider horaire sur la journée) : on fait défiler l'heure, les
-  routes et zones des autres missions apparaissent/disparaissent selon leur créneau.
-- Superposition d'un **calque de couverture** : vert = déjà couvert sur le créneau, gris =
-  personne. C'est ça, le produit — le pilote va dans le gris.
-- Tracé de sa route (appuis successifs) + dessin de zones (cercle rayon N NM, ou polygone),
-  calcul automatique des ETA à partir d'une vitesse sol saisie.
-- Avertissement si conflit espace + temps avec une autre mission (< 5 NM et < 15 min).
-- Publication → visible par tous ; notification aux missions en conflit.
+- Carte et **curseur temporel** : on fait défiler l'heure, les routes et zones des autres
+  missions apparaissent et disparaissent selon leur créneau.
+- **Calque de couverture** : vert = déjà couvert sur le créneau, gris = personne. C'est le
+  produit — le pilote va dans le gris.
+- Tracé de la route par appuis successifs, zones en cercle ou en polygone, ETA calculées à
+  partir d'une vitesse sol saisie.
+- Avertissement en cas de conflit espace + temps avec une autre mission (< 5 NM et < 15 min).
 
-### 5.6 Confidentialité
+### 5.7 Confidentialité
 
-Position temps réel des avions : **hors périmètre V2** (surveillance des pilotes,
-complexité, données sensibles). On partage des **intentions** (plans), pas du live. Un
-partage live optionnel et explicitement consenti pourra venir en V4 si les coordinateurs
-SDIS le demandent.
+Position temps réel des avions : **hors périmètre**. On partage des intentions — des plans —
+et des feux, pas la trajectoire des pilotes. Un partage en direct, optionnel et explicitement
+consenti, ne pourra venir que si les coordinateurs le demandent.
 
 ---
 
-## 6. RGPD, sécurité, responsabilité
+## 6. Données personnelles
 
-- **Données personnelles** : nom, téléphone, immatriculation, positions (= données de
-  localisation d'une personne identifiée). Base légale : intérêt légitime / mission
-  d'intérêt public selon le montage associatif. Registre de traitement + notice
-  d'information obligatoires ; les gabarits DPIA de Cumulus (`docs/05-dm-dpia.md`) sont
-  réutilisables.
-- **Rétention** : plans de vol 12 mois, signalements 3 ans (valeur de preuve/statistique),
-  traces GPS brutes non conservées côté serveur.
-- **Hébergement** UE (Scaleway, comme Cumulus).
-- **Responsabilité** : CGU explicites — VigiAero est un outil d'aide au signalement, ne
-  garantit ni la transmission ni la prise en compte de l'alerte, et ne se substitue pas au
-  112/18 ni à la radio. Écran d'acceptation au premier lancement, versionné.
-- **Anti-fausse-alerte** : appui maintenu, écran de confirmation avec récapitulatif,
-  compteur de signalements par vol, et journalisation locale horodatée.
+État actuel (F1) : **aucune donnée ne quitte le téléphone**. Nom, immatriculation, fréquence
+et positions sont stockés localement et ne partent que dans le SMS que l'utilisateur rédige
+et envoie depuis sa propre messagerie.
+
+Ce qui devra être en place avant la première remontée au serveur (F2) :
+
+- **Base légale et registre** — nom, téléphone, immatriculation et positions constituent des
+  données de localisation rattachées à une personne identifiée.
+- **Rétention** — plans de vol 12 mois, signalements 3 ans (valeur de preuve et
+  statistique), traces GPS brutes non conservées côté serveur.
+- **Hébergement** dans l'Union européenne.
+- **Mise à jour de la déclaration de confidentialité** des magasins d'applications, qui
+  déclare aujourd'hui l'absence de collecte — voir
+  [02-ios-app-store.md §5.2](02-ios-app-store.md).
+
+L'application affiche au premier lancement des conditions d'utilisation versionnées : elle
+est un outil d'aide au signalement, ne garantit ni la transmission ni la prise en compte de
+l'alerte, et ne se substitue ni au 18/112 ni à la radio.
 
 ---
 
 ## 7. Feuille de route
 
-| Phase | Contenu | Charge dev | Dépendances |
-|---|---|---|---|
-| **0. Cadrage** | Courrier CNR 114, contact SDIS pilote, FFA, montage juridique, clé OpenAIP dédiée | — | Tiers (2–6 semaines calendaires) |
-| **1. MVP alerte (Android/FR)** | Squelette Expo, carte WebView + OpenAIP, GPS natif, profil, marque verticale + point carte, formateur coordonnées testé, composeur SMS, file d'attente hors ligne, historique local, CGU | ~3 semaines | Aucune (peut démarrer en parallèle de la Phase 0) |
-| **2. Planification** | Backend Nest + PostGIS, auth, dépôt de plan, curseur temporel, calque de couverture, détection de conflits, sync des signalements | ~4 semaines | Phase 1 |
-| **3. Espagne** | i18n `fr`/`es`, table des canaux par comunidad, municipios hors ligne, gabarit de message ES, démarches My112 / 112 régionaux | ~2 semaines + démarches | Phase 1 |
-| **4. Consolidation** | Build iOS + TestFlight, cartes hors ligne (pré-téléchargement de zone), photo du feu (upload différé + lien court), export post-vol PDF/CSV pour SDIS/association, décalage relèvement/distance (« feu à 3 NM au 090 ») | ~3 semaines | Phases 1–2 |
-
-Estimations en développement effectif (un développeur assisté), hors délais tiers.
+| Phase | Contenu | État |
+|---|---|---|
+| **1. MVP alerte (Android / FR)** | Carte embarquée + OpenAIP, GPS natif, profil, marque verticale et pointage carte, carroyage DFCI hors ligne, composeur SMS, consignes, feux et suivis sur la carte, historique local | **fait** |
+| **2. Serveur** | Feux partagés entre pilotes, relais de tuiles, comptes, remontée différée | à faire |
+| **3. Planification** | Dépôt de plans, curseur temporel, calque de couverture, détection de conflits | à faire |
+| **4. Espagne** | i18n `fr`/`es`, table des canaux par communauté autonome, gabarit de message | à faire |
+| **5. Consolidation** | iOS et TestFlight, cartes hors ligne, photo du feu, export post-vol, position approximative (cf. [02-ios-app-store.md §7](02-ios-app-store.md)) | à faire |
 
 ---
 
-## 8. Décisions arrêtées (26/07/2026)
-
-| Question | Décision |
-|---|---|
-| Porteur juridique | Assumée à titre personnel par le porteur du projet pour la mise en service immédiate. À reprendre (association / convention) dès que la saison le permet. |
-| Destinataire | **114 seul** pour l'instant ; démarches API et conventions CODIS ensuite. La destination est une constante unique dans le code. |
-| Lien Google Maps | **Non** — l'alerte doit partir sans couverture data. |
-| Référentiel de position | **DFCI + degrés décimaux**, rien d'autre. Pas de commune, pas de DM ni DMS. |
-| Lien Cumulus | Applications **dissociées**. On reprend de Cumulus ce qui fait gagner du temps (principe de la carte en WebView, shim de géolocalisation, calque OpenAIP raster), sans dépendance de code ni de serveur. |
-
-Restent ouverts, à traiter hors urgence : courrier au CNR 114, convention avec un CODIS,
-assurance, RGPD (§6), clé OpenAIP dédiée.
-
----
-
-## 9. Sources
+## 8. Sources
 
 - [Le 114 — handicap.gouv.fr](https://handicap.gouv.fr/le-114-le-numero-durgence-pour-personnes-sourdes-ou-malentendantes)
 - [Urgence 114 — site officiel du service](https://info.urgence114.fr/)
-- [Le 114, numéro d'urgence — Ministère de l'Intérieur](https://www.interieur.gouv.fr/Archives/Archives-des-dossiers-de-presse/Le-114-numero-d-urgence-pour-les-personnes-sourdes-et-malentendantes)
-- [My112 — application officielle des services 112 en Espagne](http://prevenfoc.es/my112-app-emergencias/)
+- [My112 — application des services 112 en Espagne](http://prevenfoc.es/my112-app-emergencias/)
 - [APP GVA 112 Avisos — Generalitat Valenciana](https://www.112cv.gva.es/es/app-gva-112-avisos)
 - [Incendios forestales — Comunidad de Madrid](https://www.comunidad.madrid/seguridad-emergencias-asem-112/incendios-forestales)

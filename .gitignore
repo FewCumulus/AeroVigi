@@ -11,6 +11,16 @@ apps/mobile/.expo/
 .env.local
 *.keystore
 
+# Tout ce qui n'est pas destiné au dépôt public : cadrage réglementaire,
+# décisions, démarches en cours, binaires contenant une clé.
+private/
+
+# Jeu de données source du carroyage DFCI (~130 Mo) : il ne sert qu'à
+# régénérer src/data/dfciGrid.ts, qui lui est versionné et ne pèse que 11 Ko.
+# Provenance et procédure : voir l'en-tête de tools/build-dfci-grid.js.
+docs/CARRO_DFCI_2x2_L93/
+docs/CARRO_DFCI_2x2_L93.7z
+
 # Système
 .DS_Store
 Thumbs.db

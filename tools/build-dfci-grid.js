@@ -1,6 +1,12 @@
 /**
  * Génère src/data/dfciGrid.ts depuis le shapefile officiel CARRO_DFCI_2X2_L93.
  *
+ * Le shapefile (~130 Mo) n'est pas versionné : seul le résultat l'est, et il ne
+ * pèse que 11 Ko. Pour régénérer, le télécharger et le placer dans
+ * docs/CARRO_DFCI_2x2_L93/CARRO_DFCI_2x2_L93/ :
+ *   « Carroyage DFCI France (2 km) », mongeosource.fr,
+ *   uuid b4dbdf44-1fd4-42ef-be6a-75caa6c13e91
+ *
  * Pourquoi un ajustement plutôt que des constantes de projection en dur :
  * le carroyage DFCI est défini historiquement en Lambert II étendu ; reprojeté
  * en Lambert 93, il est légèrement tourné et l'angle varie avec la position

@@ -247,7 +247,7 @@ et envoie lui-même depuis sa propre messagerie. Apple considère qu'il n'y a pa
 collecte lorsque le développeur ne reçoit rien.
 
 ⚠️ **Cette réponse deviendra fausse le jour où le serveur existera** (partage
-des feux entre pilotes, cf. [plan §5.1 bis](00-plan-produit.md)). Il faudra
+des feux entre pilotes, cf. [plan §5.2](00-plan-produit.md)). Il faudra
 alors déclarer *Location — Precise* et *Contact Info — Name*, liées à
 l'identité, à l'usage « App Functionality ». Mettre à jour le questionnaire
 **avant** de publier la version qui remonte des données : une déclaration

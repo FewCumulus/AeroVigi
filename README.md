@@ -7,7 +7,7 @@ un SMS au **114** — sans couverture data.
 
 | Document | Contenu |
 |---|---|
-| [docs/00-plan-produit.md](docs/00-plan-produit.md) | Plan produit et technique : contraintes, architecture, suite (feux partagés, planification des vols, Espagne) |
+| [docs/00-plan-produit.md](docs/00-plan-produit.md) | Plan produit et technique : contraintes, architecture, carroyage DFCI, suite (feux partagés, planification des vols, Espagne) |
 | [docs/02-ios-app-store.md](docs/02-ios-app-store.md) | Portage iOS et publication App Store : prérequis, chaîne de compilation, différences de comportement, revue Apple |
 
 ---
@@ -36,7 +36,7 @@ un SMS au **114** — sans couverture data.
    marqueur rouvre la fiche pour un message de suivi — « arrivée de véhicules
    d'intervention » ou « le feu semble maîtrisé », ce dernier grisant le
    marqueur. Le partage de ces feux entre pilotes viendra avec le serveur
-   ([plan §5.1 bis](docs/00-plan-produit.md)).
+   ([plan §5.2](docs/00-plan-produit.md)).
 
 ### Le message
 
@@ -64,8 +64,9 @@ Appel vocal impossible
 
 ## Installer l'APK
 
-`VigiAero-0.1.0.apk` à la racine du dépôt (copie de
-`apps/mobile/android/app/build/outputs/apk/release/app-release.apk`).
+Les APK ne sont pas versionnés : récupérer celui de la dernière *release*, ou le
+compiler soi-même (voir « Recompiler » ci-dessous — le fichier est alors dans
+`apps/mobile/android/app/build/outputs/apk/release/`).
 
 1. Copier le fichier sur le téléphone (câble USB, envoi par mail, cloud…).
 2. L'ouvrir depuis le gestionnaire de fichiers.
@@ -77,66 +78,46 @@ Appel vocal impossible
 Installation par USB, si le téléphone est en mode développeur :
 
 ```bash
-C:\Users\v1v1\.buildtools\android-sdk\platform-tools\adb.exe install -r apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+adb install -r app-release.apk
 ```
 
 ---
 
 ## Clé OpenAIP
 
-La surcouche aéronautique de la carte vient de l'API de tuiles OpenAIP, qui
-demande une clé. Il faut être clair sur ce qui est protégeable et ce qui ne
-l'est pas.
+La surcouche aéronautique de la carte (espaces aériens) provient de l'API de
+tuiles OpenAIP, qui demande une clé. Elle est **facultative** : sans clé,
+l'application fonctionne et affiche le seul fond OpenStreetMap. Les alertes n'en
+dépendent pas.
 
-**Une clé placée dans une application installée n'est pas un secret.** Quel que
-soit le mécanisme — variable d'environnement, secret EAS, fichier de
-configuration — elle finit dans l'APK, d'où elle s'extrait en quelques minutes
-avec un outil courant. Aucune manipulation côté client ne change cela. Les
-mécanismes ci-dessous protègent le **dépôt**, ce qui reste utile, mais pas le
-binaire.
+Une clé gratuite s'obtient sur [openaip.net](https://www.openaip.net), dans les
+paramètres du compte. Deux façons de la fournir.
 
-Trois niveaux, du plus simple au plus solide :
+**Dans l'application** — *Menu → Profil → Clé OpenAIP*. La clé est stockée sur
+le téléphone et prend le pas sur une éventuelle clé de compilation. C'est le
+mode prévu pour les versions distribuées : le binaire ne contient alors aucune
+clé.
 
-1. **Clé hors du dépôt** (en place). `apps/mobile/app.config.ts` lit
-   `VIGIAERO_OPENAIP_KEY` dans l'environnement ; `.env` est ignoré par Git et
-   `.env.example` documente la variable. Le dépôt public ne contient donc aucune
-   clé — mais l'APK que vous distribuez, si.
-2. **Clé fournie par l'utilisateur** (en place). *Menu → Profil → Clé OpenAIP* :
-   chaque pilote saisit la sienne, obtenue gratuitement sur openaip.net. Elle
-   prend le pas sur celle du build. C'est la solution recommandée pour une
-   diffusion en accès libre : **vous ne distribuez aucun secret**, et
-   l'application reste pleinement fonctionnelle sans clé, en fond
-   OpenStreetMap seul.
-3. **Relais côté serveur** (à faire avec le serveur, voir
-   [le plan §5.3](docs/00-plan-produit.md)). Le serveur détient la clé et relaie
-   les tuiles ; l'application n'en voit jamais. C'est la seule protection réelle,
-   au prix d'une infrastructure et de la bande passante — à mettre en cache.
-
-**À faire avant toute publication :** ne pas diffuser la clé du projet Cumulus.
-Elle appartient à une autre application en production ; un usage massif via
-VigiAero la ferait limiter ou révoquer pour les deux. Tant que vous n'avez pas
-de clé propre, publiez sans clé embarquée : les pilotes saisiront la leur.
+**À la compilation** — `apps/mobile/app.config.ts` lit la variable
+d'environnement `VIGIAERO_OPENAIP_KEY`. Copier `.env.example` en `.env` (ignoré
+par Git) et y renseigner la clé, ou la passer à la commande de compilation. Une
+clé injectée ainsi se retrouve dans le binaire, d'où elle est extractible : à
+réserver aux compilations privées.
 
 ## Recompiler
 
-La chaîne de compilation est locale, sans compte Expo ni service tiers. Elle est
-installée dans `C:\Users\v1v1\.buildtools` (JDK 17 + SDK Android).
+La chaîne de compilation est locale : JDK 17 et SDK Android (plateforme 36,
+build-tools 36), sans compte Expo ni service tiers.
 
 ```bash
-cd apps/mobile/android && ./gradlew.bat assembleRelease
+cd apps/mobile/android && ./gradlew assembleRelease
 ```
 
-Avec les variables d'environnement :
+`JAVA_HOME` et `ANDROID_HOME` doivent pointer sur le JDK et le SDK. Pour
+embarquer une clé OpenAIP dans le binaire :
 
 ```bash
-JAVA_HOME=C:\Users\v1v1\.buildtools\jdk-17.0.19+10
-ANDROID_HOME=C:\Users\v1v1\.buildtools\android-sdk
-```
-
-Avec la clé OpenAIP, si vous en avez une à embarquer :
-
-```bash
-VIGIAERO_OPENAIP_KEY=votre_cle ./gradlew.bat assembleRelease
+VIGIAERO_OPENAIP_KEY=votre_cle ./gradlew assembleRelease
 ```
 
 Après un `npx expo prebuild` (qui régénère `android/` et écrase la
@@ -171,13 +152,12 @@ Compiler pour iOS exige macOS, ce qui, depuis Windows, passe par EAS Build :
 cd apps/mobile && eas build --platform ios --profile preview
 ```
 
-Les prérequis, les différences de comportement et ce qu'Apple demande à la
-revue sont détaillés dans
-[docs/02-ios-app-store.md](docs/02-ios-app-store.md). Deux points à connaître
-avant de s'engager : le compte Apple Developer coûte 99 $ par an et sa
-validation prend de quelques jours à deux semaines ; et il reste un correctif à
-faire côté code — la **position approximative** d'iOS 14+ et d'Android 12+
-produirait une maille DFCI fausse (voir §7 du même document).
+Les prérequis, les différences de comportement et ce qu'Apple demande à la revue
+sont détaillés dans [docs/02-ios-app-store.md](docs/02-ios-app-store.md). Deux
+points de calendrier et de code y figurent : le compte Apple Developer coûte
+99 $ par an et sa validation prend de quelques jours à deux semaines ; et la
+**position approximative** d'iOS 14+ et d'Android 12+ produirait une maille DFCI
+fausse — correctif à faire avant publication (§7 du même document).
 
 ---
 
@@ -230,7 +210,7 @@ Les fichiers `src/data/*` et `src/lib/mapHtml.ts` sont **générés** — ne pas
 
 | Commande | Produit |
 |---|---|
-| `node tools/build-dfci-grid.js` | `src/data/dfciGrid.ts` — la grille DFCI dérivée du shapefile officiel, vérifiée sur ses 339 264 mailles, en 11 Ko |
+| `node tools/build-dfci-grid.js` | `src/data/dfciGrid.ts` — la grille DFCI dérivée du shapefile officiel, vérifiée sur ses 339 264 mailles, en 11 Ko. Le shapefile source (~130 Mo) n'est pas versionné : voir l'en-tête du script pour sa provenance |
 | `node tools/build-map-html.js` | `src/lib/mapHtml.ts` — la page Leaflet embarquée (Leaflet 1.9.4 intégré, pour que la carte fonctionne sans réseau) |
 | `node tools/apply-signing.js` | configuration de signature du projet Android |
 | `powershell -File tools/build-icons.ps1` | les icônes de l'app, dérivées de `docs/Logo VigiAero clean.png` (l'icône adaptative Android étant recadrée en cercle, le logo est réduit à 66 % pour tenir dans la zone garantie) |
@@ -253,12 +233,14 @@ Les fichiers `src/data/*` et `src/lib/mapHtml.ts` sont **générés** — ne pas
   se superposent, de sorte qu'un signalement fait hors couverture ne fait pas
   perdre les tuiles déjà affichées.
 - **Le 114 est un service dédié.** Il s'adresse d'abord aux personnes sourdes,
-  malentendantes ou aphasiques. L'usage par un pilote qui ne peut pas parler en
-  vol doit être validé auprès du service, et l'idéal reste une convention avec le
-  CODIS concerné. La destination est isolée dans une constante (`DESTINATION`
-  dans `ReportScreen.tsx`) pour être changée en une ligne.
+  malentendantes ou aphasiques, ainsi qu'à celles momentanément dans
+  l'incapacité de parler — le cas d'un pilote au casque, moteur en marche. Les
+  conditions affichées au premier lancement le rappellent, et invitent à
+  appeler le 18 ou le 112 dès que la parole est possible. La destination est
+  isolée dans une constante (`DESTINATION` dans `src/screens/ReportScreen.tsx`)
+  et se change en une ligne.
 - **Surcouche aéronautique conditionnée à une clé OpenAIP** — voir la section
-  ci-dessous. Sans clé, la carte n'affiche que le fond OpenStreetMap ; les
+  « Clé OpenAIP ». Sans clé, la carte n'affiche que le fond OpenStreetMap ; les
   alertes, elles, ne dépendent pas de la clé.
 - **Altitude GPS, pas QNH.** Le récepteur rend une altitude rapportée à
   l'ellipsoïde ; l'écart avec l'altitude barométrique atteint environ 150 ft en
