@@ -28,7 +28,7 @@ export function MenuScreen({
     return (
         <View style={s.root}>
             <ScrollView contentContainerStyle={s.scroll}>
-                <Text style={s.h1}>VigiAero</Text>
+                <Text style={s.h1}>AeroVigi</Text>
 
                 <Btn label="Profil observateur" variant="secondary" onPress={onProfile} />
                 <Btn

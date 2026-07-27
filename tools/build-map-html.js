@@ -15,7 +15,7 @@ const LEAFLET = '1.9.4';
 const get = (url) =>
     new Promise((resolve, reject) => {
         https
-            .get(url, { headers: { 'User-Agent': 'VigiAero/0.1' } }, (res) => {
+            .get(url, { headers: { 'User-Agent': 'AeroVigi/0.1' } }, (res) => {
                 if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
                     return resolve(get(res.headers.location));
                 }

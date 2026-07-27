@@ -13,10 +13,10 @@ import type { ConfigContext, ExpoConfig } from 'expo/config';
  */
 export default ({ config }: ConfigContext): ExpoConfig => ({
     ...config,
-    name: config.name ?? 'VigiAero',
-    slug: config.slug ?? 'vigiaero',
+    name: config.name ?? 'AeroVigi',
+    slug: config.slug ?? 'aerovigi',
     extra: {
         ...config.extra,
-        openAipKey: process.env.VIGIAERO_OPENAIP_KEY ?? '',
+        openAipKey: process.env.AEROVIGI_OPENAIP_KEY ?? '',
     },
 });

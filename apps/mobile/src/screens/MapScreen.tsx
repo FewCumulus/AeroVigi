@@ -140,7 +140,7 @@ export function MapScreen({
         <View style={s.root}>
             <WebView
                 ref={webRef}
-                source={{ html, baseUrl: 'https://vigiaero.local' }}
+                source={{ html, baseUrl: 'https://aerovigi.local' }}
                 style={s.web}
                 originWhitelist={['*']}
                 javaScriptEnabled

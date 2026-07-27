@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "VigiAero",
-    "slug": "vigiaero",
-    "scheme": "vigiaero",
+    "name": "AeroVigi",
+    "slug": "aerovigi",
+    "scheme": "aerovigi",
     "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -11,27 +11,33 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "VigiAero utilise votre position pour situer le feu que vous signalez aux secours."
+          "locationWhenInUsePermission": "AeroVigi utilise votre position pour situer le feu que vous signalez aux secours."
         }
       ]
     ],
     "ios": {
-      "bundleIdentifier": "fr.vigiaero.app",
+      "bundleIdentifier": "fr.aerovigi.app",
       "supportsTablet": false,
       "icon": "./assets/icon-ios.png",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "VigiAero utilise votre position pour indiquer aux secours l’endroit exact du feu que vous signalez.",
+        "NSLocationWhenInUseUsageDescription": "AeroVigi utilise votre position pour indiquer aux secours l’endroit exact du feu que vous signalez.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
-      "package": "fr.vigiaero.app",
+      "package": "fr.aerovigi.app",
       "adaptiveIcon": {
         "backgroundColor": "#32A6F9",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png"
       },
       "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"],
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.VIBRATE"
+      ],
       "predictiveBackGestureEnabled": false
     },
     "web": {

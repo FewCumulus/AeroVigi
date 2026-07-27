@@ -1,5 +1,5 @@
 /**
- * VigiAero — vigilance feux de forêt depuis un avion léger.
+ * AeroVigi — vigilance feux de forêt depuis un avion léger.
  *
  * Navigation volontairement tenue par un état local plutôt que par un routeur :
  * cinq écrans, aucune URL à partager, et une chaîne d'outils en moins entre le

@@ -1,4 +1,4 @@
-# VigiAero
+# AeroVigi
 
 Signalement de feux de forêt depuis un avion léger. Une position, un type de feu,
 un SMS au **114** — sans couverture data.
@@ -99,7 +99,7 @@ mode prévu pour les versions distribuées : le binaire ne contient alors aucune
 clé.
 
 **À la compilation** — `apps/mobile/app.config.ts` lit la variable
-d'environnement `VIGIAERO_OPENAIP_KEY`. Copier `.env.example` en `.env` (ignoré
+d'environnement `AEROVIGI_OPENAIP_KEY`. Copier `.env.example` en `.env` (ignoré
 par Git) et y renseigner la clé, ou la passer à la commande de compilation. Une
 clé injectée ainsi se retrouve dans le binaire, d'où elle est extractible : à
 réserver aux compilations privées.
@@ -117,7 +117,7 @@ cd apps/mobile/android && ./gradlew assembleRelease
 embarquer une clé OpenAIP dans le binaire :
 
 ```bash
-VIGIAERO_OPENAIP_KEY=votre_cle ./gradlew assembleRelease
+AEROVIGI_OPENAIP_KEY=votre_cle ./gradlew assembleRelease
 ```
 
 Après un `npx expo prebuild` (qui régénère `android/` et écrase la
@@ -212,15 +212,15 @@ Les fichiers `src/data/*` et `src/lib/mapHtml.ts` sont **générés** — ne pas
 |---|---|
 | `node tools/build-dfci-grid.js` | `src/data/dfciGrid.ts` — la grille DFCI dérivée du shapefile officiel, vérifiée sur ses 339 264 mailles, en 11 Ko. Le shapefile source (~130 Mo) n'est pas versionné : voir l'en-tête du script pour sa provenance |
 | `node tools/build-map-html.js` | `src/lib/mapHtml.ts` — la page Leaflet embarquée (Leaflet 1.9.4 intégré, pour que la carte fonctionne sans réseau) |
-| `node tools/apply-signing.js` | configuration de signature du projet Android |
-| `powershell -File tools/build-icons.ps1` | les icônes de l'app, dérivées de `docs/Logo VigiAero clean.png` (l'icône adaptative Android étant recadrée en cercle, le logo est réduit à 66 % pour tenir dans la zone garantie) |
+| `node tools/apply-signing.js` | correctifs du projet Android généré : signature de release, et retrait des permissions déclarées par React Native mais inutilisées ici (dont `SYSTEM_ALERT_WINDOW`). À relancer après chaque `expo prebuild` |
+| `powershell -File tools/build-icons.ps1` | les icônes de l'app, dérivées de `docs/Logo AeroVigi clean.png` (l'icône adaptative Android étant recadrée en cercle, le logo est réduit à 66 % pour tenir dans la zone garantie) |
 
 ---
 
 ## Limites connues
 
 - **Envoi non automatique.** Android réserve l'envoi de SMS en arrière-plan aux
-  applications de messagerie par défaut, et iOS l'interdit totalement. VigiAero
+  applications de messagerie par défaut, et iOS l'interdit totalement. AeroVigi
   ouvre donc la messagerie avec le message prêt : il reste un appui sur
   « Envoyer ». C'est aussi ce qui empêche les fausses alertes.
 - **Aucun accusé de réception.** Android ne remonte pas le statut d'envoi :

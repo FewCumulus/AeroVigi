@@ -1,4 +1,4 @@
-# VigiAero — portage iOS et publication App Store
+# AeroVigi — portage iOS et publication App Store
 
 > Guide de développement. Mis à jour le 27/07/2026, sur la base de l'état réel
 > du dépôt à cette date.
@@ -26,7 +26,7 @@ une plateforme.
 
 Déjà en place dans le dépôt :
 
-- `apps/mobile/app.json` → bloc `ios` : identifiant `fr.vigiaero.app`,
+- `apps/mobile/app.json` → bloc `ios` : identifiant `fr.aerovigi.app`,
   `supportsTablet: false`, icône dédiée sans canal alpha, chaîne d'autorisation
   de localisation, `ITSAppUsesNonExemptEncryption: false` ;
 - `apps/mobile/eas.json` → profils `development`, `preview`, `production` pour
@@ -114,7 +114,7 @@ Ne la mettez pas dans le dépôt (voir README, section « Clé OpenAIP »). Pour
 compilation EAS :
 
 ```bash
-eas secret:create --scope project --name VIGIAERO_OPENAIP_KEY --value <cle>
+eas secret:create --scope project --name AEROVIGI_OPENAIP_KEY --value <cle>
 ```
 
 Rappel : la clé se retrouve dans le binaire, donc dans l'IPA téléchargeable
@@ -219,7 +219,7 @@ l'essentiel des allers-retours.
 
 Le champ *Notes for Review* d'App Store Connect. Texte à adapter :
 
-> VigiAero is used by private pilots in France to report forest fires they see
+> AeroVigi is used by private pilots in France to report forest fires they see
 > from the air. Tapping the alert button opens the **system Messages composer**
 > pre-filled with the fire's coordinates and the French DFCI grid reference.
 > The app never sends anything by itself — the user must tap Send.
@@ -293,7 +293,7 @@ pilote au-dessus de l'Espagne.
 - [ ] Apple Developer Program actif, contrats fiscaux et bancaires signés dans
       App Store Connect (une application gratuite exige quand même le contrat
       d'application gratuite)
-- [ ] Identifiant `fr.vigiaero.app` enregistré dans le portail Apple
+- [ ] Identifiant `fr.aerovigi.app` enregistré dans le portail Apple
 - [ ] Projet Expo créé (`eas init`), secret OpenAIP décidé (défini ou non)
 
 **Binaire**

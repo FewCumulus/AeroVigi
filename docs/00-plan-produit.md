@@ -1,4 +1,4 @@
-# VigiAero — Plan produit & technique
+# AeroVigi — Plan produit & technique
 
 > Application mobile (Expo / React Native) permettant aux pilotes privés en vol de faire de
 > la vigilance feux de forêt : alerte en un geste, et — à venir — partage des feux signalés
@@ -35,7 +35,7 @@ n'est contournable par un choix d'implémentation.
   demande est rejetée.
 - **iOS** : aucun envoi par programme, quelle que soit la configuration.
 
-Le « un geste » réel est donc : **1 appui dans VigiAero → la fenêtre SMS du système s'ouvre
+Le « un geste » réel est donc : **1 appui dans AeroVigi → la fenêtre SMS du système s'ouvre
 pré-remplie (destinataire et texte) → 1 appui sur Envoyer**. Le second geste est imposé par
 les magasins ; il fait aussi office de sécurité anti-fausse-alerte.
 
@@ -68,7 +68,7 @@ destinataires régionaux. La destination est aujourd'hui une constante unique
 ## 3. Architecture
 
 ```
-VigiAero/
+AeroVigi/
 ├── apps/mobile/            # Expo SDK 57, React Native 0.86, TypeScript
 │   ├── App.tsx             # machine à états à cinq écrans (pas de routeur)
 │   ├── assets/             # icônes générées

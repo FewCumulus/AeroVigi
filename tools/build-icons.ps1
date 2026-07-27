@@ -1,4 +1,4 @@
-# Génère les icônes de l'application depuis docs/Logo VigiAero clean.png.
+# Génère les icônes de l'application depuis docs/Logo AeroVigi.png.
 #
 # Deux pièges traités ici :
 #
@@ -19,7 +19,7 @@
 Add-Type -AssemblyName System.Drawing
 
 $root = Split-Path -Parent $PSScriptRoot
-$src = Join-Path $root 'docs\Logo VigiAero clean.png'
+$src = Join-Path $root 'docs\Logo AeroVigi.png'
 $assets = Join-Path $root 'apps\mobile\assets'
 
 $logo = [System.Drawing.Image]::FromFile($src)

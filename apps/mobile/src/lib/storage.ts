@@ -6,9 +6,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Intention, Observer, ReportType, Severity } from './message';
 
-const K_PROFILE = 'vigiaero.profile.v1';
-const K_ACCEPTED = 'vigiaero.disclaimer.v1';
-const K_REPORTS = 'vigiaero.reports.v1';
+const K_PROFILE = 'aerovigi.profile.v1';
+const K_ACCEPTED = 'aerovigi.disclaimer.v1';
+const K_REPORTS = 'aerovigi.reports.v1';
 
 export const EMPTY_PROFILE: Observer = {
     name: '',
