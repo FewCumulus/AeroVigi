@@ -3,7 +3,7 @@ node_modules/
 apps/mobile/android/
 apps/mobile/ios/
 apps/mobile/.expo/
-*.aab
+
 
 # Secrets — ne jamais versionner
 .env
