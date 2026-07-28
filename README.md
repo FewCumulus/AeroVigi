@@ -43,9 +43,20 @@ un SMS au **114** — sans couverture data.
 9. **Lien vers la [Météo des forêts](https://meteofrance.com/meteo-des-forets)**
    de Météo-France en tête de menu, à consulter au sol avant le vol.
 
-Le bouton retour d'Android ramène à l'écran précédent ; sur la carte, il ne fait
-rien plutôt que de fermer l'application — un geste de trop en vol
-déchargerait les tuiles.
+Le bouton retour d'Android ramène à l'écran précédent ; sur la carte (l'écran
+racine), un double appui est requis pour quitter — un geste de trop en vol ne
+doit pas décharger les tuiles. Un premier appui affiche « Appuyez de nouveau
+pour quitter » ; sans confirmation dans les 2 secondes, l'application reste au
+premier plan.
+
+### R8 / réduction de la taille
+
+Le binaire est compilé avec R8 (minification du code Java/Kotlin) et réduction
+des ressources inutilisées, via le plugin `expo-build-properties`
+(`android.enableMinifyInReleaseBuilds` / `enableShrinkResourcesInReleaseBuilds`
+dans `app.json`). Effet mesuré : APK de 71,6 Mo → 66,4 Mo. N'affecte pas le
+bundle JavaScript (Hermes), seulement le code natif Android — testé sur
+appareil après activation, aucune régression observée.
 
 ### Le message
 
@@ -221,7 +232,7 @@ Les fichiers `src/data/*` et `src/lib/mapHtml.ts` sont **générés** — ne pas
 |---|---|
 | `node tools/build-dfci-grid.js` | `src/data/dfciGrid.ts` — la grille DFCI dérivée du shapefile officiel, vérifiée sur ses 339 264 mailles, en 11 Ko. Le shapefile source (~130 Mo) n'est pas versionné : voir l'en-tête du script pour sa provenance |
 | `node tools/build-map-html.js` | `src/lib/mapHtml.ts` — la page Leaflet embarquée (Leaflet 1.9.4 intégré, pour que la carte fonctionne sans réseau) |
-| `node tools/apply-signing.js` | correctifs du projet Android généré : signature de release, report de la version d'`app.json` dans `build.gradle` (`versionName` et `versionCode`, que le prebuild seul ne met pas à jour), et retrait des permissions déclarées par React Native mais inutilisées ici (dont `SYSTEM_ALERT_WINDOW`). À relancer après chaque `expo prebuild`, et après chaque changement de version |
+| `node tools/apply-signing.js` | correctifs du projet Android généré : signature de release, report de la version d'`app.json` dans `build.gradle` (`versionName` et `versionCode`, que le prebuild seul ne met pas à jour), retrait des permissions déclarées par React Native mais inutilisées ici (dont `SYSTEM_ALERT_WINDOW`), et retrait des attributs de thème dépréciés pour l'affichage bord à bord (`android:statusBarColor` / `android:navigationBarColor`, déjà transparents par défaut sous edge-to-edge). À relancer après chaque `expo prebuild`, et après chaque changement de version |
 | `powershell -File tools/build-icons.ps1` | les icônes de l'app, dérivées de `docs/Logo AeroVigi clean.png` (l'icône adaptative Android étant recadrée en cercle, le logo est réduit à 66 % pour tenir dans la zone garantie) |
 
 ---
@@ -257,3 +268,9 @@ Les fichiers `src/data/*` et `src/lib/mapHtml.ts` sont **générés** — ne pas
   d'observation indicative, pas une altitude de vol.
 - **APK de 70 Mo** (toutes architectures dans un seul fichier) : trop lourd pour
   un envoi par courriel, à passer par câble USB ou par un partage de fichiers.
+- **Verrouillage portrait volontairement conservé**, malgré la recommandation
+  Play Console (« qualité technique ») de le retirer pour les grands écrans.
+  Testé en rotation : le bouton MARQUE VERTICALE chevauche la carte et les
+  commandes latérales se retrouvent tronquées — inacceptable sur une
+  application de sécurité utilisée en vol. La recommandation reste affichée
+  côté Play Console, elle n'est que documentaire, pas bloquante.

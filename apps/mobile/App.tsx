@@ -5,8 +5,15 @@
  * cinq écrans, aucune URL à partager, et une chaîne d'outils en moins entre le
  * code et l'APK.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { BackHandler, StatusBar, StyleSheet, View, ActivityIndicator } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+    BackHandler,
+    StatusBar,
+    StyleSheet,
+    ToastAndroid,
+    View,
+    ActivityIndicator,
+} from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SMS from 'expo-sms';
 import { MapScreen, type PickedPoint } from './src/screens/MapScreen';
@@ -106,12 +113,21 @@ export default function App() {
     /**
      * Bouton retour d'Android.
      *
-     * Par défaut il ferme l'application. En vol, c'est le pire comportement
-     * possible : un geste de trop et la carte est démontée, donc rechargée —
-     * et sans réseau, perdue. Chaque écran renvoie donc explicitement vers son
-     * précédent, et la carte, qui est la racine, absorbe l'appui sans rien
-     * faire. On quitte par le bouton d'accueil du téléphone.
+     * Par défaut il ferme l'application. En vol, un simple geste de trop ne
+     * doit pas y suffire : la carte serait démontée, donc rechargée — et sans
+     * réseau, perdue. Chaque écran renvoie donc explicitement vers son
+     * précédent, et sur la carte (l'écran racine) un double appui est requis
+     * pour quitter.
+     *
+     * Absorber le retour sans jamais offrir de sortie — ce qui était fait ici
+     * avant — piège aussi bien l'utilisateur que l'exploration automatisée des
+     * magasins d'applications : leurs robots de test naviguent via le bouton
+     * retour, et une application qui ne le laisse jamais fermer l'app est
+     * jugée insuffisamment testable, ce qui bascule la revue en mode manuel.
+     * Le double appui satisfait les deux : protection contre la fermeture
+     * accidentelle, et sortie réelle et prévisible.
      */
+    const lastBackPressAt = useRef(0);
     useEffect(() => {
         const sub = BackHandler.addEventListener('hardwareBackPress', () => {
             switch (screen.name) {
@@ -127,6 +143,16 @@ export default function App() {
                 case 'disclaimer':
                     if (screen.readOnly) setScreen({ name: 'menu' });
                     return true;
+                case 'map': {
+                    const now = Date.now();
+                    if (now - lastBackPressAt.current < 2000) {
+                        BackHandler.exitApp();
+                    } else {
+                        lastBackPressAt.current = now;
+                        ToastAndroid.show('Appuyez de nouveau pour quitter', ToastAndroid.SHORT);
+                    }
+                    return true;
+                }
                 default:
                     return true;
             }

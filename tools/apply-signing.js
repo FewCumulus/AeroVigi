@@ -24,6 +24,7 @@ const ANDROID = path.join(MOBILE, 'android');
 const GRADLE = path.join(ANDROID, 'app', 'build.gradle');
 const PROPS = path.join(ANDROID, 'gradle.properties');
 const MANIFEST = path.join(ANDROID, 'app', 'src', 'main', 'AndroidManifest.xml');
+const STYLES = path.join(ANDROID, 'app', 'src', 'main', 'res', 'values', 'styles.xml');
 
 /** Permissions héritées de React Native, dont AeroVigi ne se sert pas. */
 const UNUSED_PERMISSIONS = [
@@ -155,5 +156,29 @@ if (fs.existsSync(MANIFEST)) {
     );
 } else {
     console.error('AndroidManifest.xml introuvable — permissions non vérifiées.');
+    process.exit(1);
+}
+
+// --- Attributs de thème dépréciés pour l'affichage bord à bord --------------
+// Le gabarit Expo écrit `android:statusBarColor` / `android:navigationBarColor`
+// dans le thème (même valeur `transparent` que le comportement par défaut sous
+// edge-to-edge). Ces deux attributs sont dépréciés depuis Android 15 : leur
+// seule présence, même sans effet visuel, est ce que le pré-lancement de Play
+// Console signale comme « API ou paramètres obsolètes pour l'affichage bord à
+// bord ». Les retirer ne change rien à l'écran, `edgeToEdgeEnabled=true`
+// (gradle.properties, déjà généré par Expo) gère seul la transparence.
+if (fs.existsSync(STYLES)) {
+    let styles = fs.readFileSync(STYLES, 'utf8');
+    const before = styles;
+    styles = styles.replace(/\s*<item name="android:statusBarColor">[^<]*<\/item>/, '');
+    styles = styles.replace(/\s*<item name="android:navigationBarColor">[^<]*<\/item>/, '');
+    if (styles !== before) {
+        fs.writeFileSync(STYLES, styles, 'utf8');
+        console.log('Attributs de thème dépréciés (bord à bord) retirés.');
+    } else {
+        console.log('Attributs de thème dépréciés : rien à retirer.');
+    }
+} else {
+    console.error('styles.xml introuvable — thème bord à bord non vérifié.');
     process.exit(1);
 }
