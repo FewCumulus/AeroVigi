@@ -388,6 +388,6 @@ publication publique.
 | 1 | ~~Précision réduite~~ | **Traité** le 29/07/2026, voir §4.3 — pour les deux plateformes à la fois. |
 | 2 | ~~Écran de démarrage~~ | **Traité** le 29/07/2026 — `expo-splash-screen` configuré explicitement (fond `#32A6F9`, logo), plutôt que de compter sur un défaut non vérifiable pour iOS depuis Windows. |
 | 3 | Vérifier `PrivacyInfo.xcprivacy` | Après la première compilation EAS — impossible à vérifier avant, le fichier n'existe que dans le projet iOS généré (voir §2.2 : generation refusée sous Windows). |
-| 4 | Page de politique de confidentialité | Obligatoire pour la fiche, à héberger. |
+| 4 | ~~Page de politique de confidentialité~~ | **Traité** le 29/07/2026 — rédigée (`docs/privacy.html`), reste à héberger publiquement et à coller l'URL dans App Store Connect / Play Console. |
 | 5 | Essai du composeur SMS sur iPhone | `isAvailableAsync` étant faux sur simulateur, ce chemin n'est vérifiable qu'en réel. |
 | 6 | Essai réel de la position approximative sur iPhone | Le correctif du point 1 est vérifié par la logique (tests unitaires, lecture du bon champ d'API) mais pas par un appareil réel en mode « position approximative » — à faire en même temps que le point 5. |
