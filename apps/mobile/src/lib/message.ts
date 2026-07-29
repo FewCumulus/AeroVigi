@@ -96,6 +96,14 @@ export type FireObservation = {
     severity: Severity;
     intention: Intention;
     at: Date;
+    /**
+     * Faux si l'utilisateur n'a accordé qu'une position approximative
+     * (quelques kilomètres). Le DFCI a une maille de 2 km : dans ce cas le
+     * code calculé peut désigner la mauvaise cellule. On ne le retire pas —
+     * une indication approximative reste utile — mais on l'annonce comme tel,
+     * en ligne essentielle, jamais sacrifiée pour la place.
+     */
+    precise?: boolean;
 };
 
 export type BuiltMessage = {
@@ -130,6 +138,10 @@ export function buildAlertMessage(obs: FireObservation, observer: Observer): Bui
     head += ' vu d avion';
 
     const essential = [head];
+    // Avertissement de précision : essentiel, jamais écarté pour la place —
+    // un CODIS qui ignore l'incertitude peut concentrer sa recherche sur la
+    // seule maille DFCI indiquée et manquer le feu.
+    if (obs.precise === false) essential.push('POSITION APPROX +/- qq km');
     if (dfci) essential.push(`DFCI ${dfci.code}`);
     essential.push(dd);
 

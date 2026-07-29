@@ -1,7 +1,8 @@
 # AeroVigi — portage iOS et publication App Store
 
-> Guide de développement. Mis à jour le 27/07/2026, sur la base de l'état réel
-> du dépôt à cette date.
+> Guide de développement. Mis à jour le 29/07/2026 après trois cycles de revue
+> Play Console (versions 1.1.0 → 1.3.0) et une vérification empirique de ce qui
+> fonctionne réellement sous Windows pour iOS (§2.2).
 >
 > À lire d'abord si vous venez de la version Android : §1 (ce qui est déjà
 > prêt), §2 (les délais que vous ne maîtrisez pas), §5 (ce qu'Apple va demander).
@@ -33,7 +34,18 @@ Déjà en place dans le dépôt :
   les deux plateformes ;
 - `apps/mobile/assets/icon-ios.png` → 1024×1024, **24 bits sans canal alpha**
   (voir §4.1, c'est un motif de rejet fréquent) ;
-- orientation verrouillée en portrait, comme sur Android.
+- orientation verrouillée en portrait sur les deux plateformes (`orientation`
+  est un champ unique dans `app.json`, sans déclinaison par plateforme) —
+  testé en rotation sur Android : le bouton d'alerte chevauche la carte en
+  paysage, la même contrainte s'applique donc à l'iPhone ;
+- écran de démarrage configuré explicitement via le plugin `expo-splash-screen`
+  (fond `#32A6F9`, logo AeroVigi) plutôt que de compter sur un comportement par
+  défaut non vérifiable pour iOS depuis Windows (voir §2.2) ;
+- position approximative (iOS 14+ / Android 12+) détectée et gérée : le code
+  DFCI est masqué et le SMS d'alerte porte un avertissement explicite plutôt
+  que d'envoyer une position possiblement fausse (`useAircraftPosition.ts`,
+  `message.ts` — voir §4.3, ancien point 1 de la liste « reste à faire », donc
+  traité).
 
 Il n'y a **pas** de dossier `ios/` : le projet reste en configuration gérée
 (*Continuous Native Generation*). Le projet Xcode est fabriqué à la demande par
@@ -75,7 +87,22 @@ options :
   déboguer, indispensable si vous voulez itérer vite.
 
 À la différence d'Android, il n'existe **aucun contournement** : pas de
-chaîne locale possible sous Windows.
+chaîne locale possible sous Windows — et la contrainte est plus stricte qu'il
+n'y paraît. Testé directement : `npx expo prebuild --platform ios` sur cette
+machine Windows **refuse de s'exécuter**, avec ce message explicite du CLI :
+
+```
+⚠️  Skipping generating the iOS native project files. Run npx expo prebuild
+    again from macOS or Linux to generate the iOS project.
+```
+
+Autrement dit, ce n'est pas seulement la compilation Xcode qui exige macOS —
+**générer la simple arborescence de fichiers du projet iOS l'exige aussi**
+(CocoaPods et les outils de génération de projet Xcode ne sont pas pris en
+charge sous Windows par le CLI Expo). Une machine Linux suffirait pour cette
+étape de génération, mais pas pour la compilation elle-même. En clair : depuis
+ce poste, tout ce qui touche à iOS passe par EAS Build, sans exception, y
+compris pour une simple inspection du projet généré.
 
 ### 2.3 Identifiants de signature
 
@@ -185,10 +212,32 @@ justification écrite, pour un besoin que nous n'avons pas.
 
 Depuis iOS 14, l'utilisateur peut n'accorder qu'une **position approximative**.
 Le carroyage DFCI ayant une maille de 2 km, une position approximative
-(quelques kilomètres) donnerait une **maille fausse**. À traiter avant
-publication : lire `CLLocationManager.accuracyAuthorization`, et si elle est
-réduite, soit demander une précision temporaire complète, soit afficher un
-avertissement franc à la place du code DFCI. Voir §7.
+(quelques kilomètres) donnerait une **maille fausse**. **Traité** :
+`useAircraftPosition.ts` lit `permission.ios?.accuracy` (`'full' | 'reduced'`,
+et l'équivalent `permission.android?.accuracy` sur Android) et expose un
+indicateur `precise`. Quand il est faux :
+
+- la carte masque le code DFCI au profit d'un bandeau « Position
+  approximative » ;
+- l'écran de confirmation encadre la position en rouge avec la même mise en
+  garde ;
+- **le SMS lui-même porte l'avertissement** (`POSITION APPROX +/- qq km`),
+  en ligne essentielle jamais sacrifiée pour tenir en un segment — c'est le
+  point qui compte : un CODIS qui ignore l'incertitude peut concentrer sa
+  recherche sur la seule maille indiquée et manquer le feu.
+
+**Vérifié sur émulateur Android** le 29/07/2026 (`ACCESS_FINE_LOCATION`
+révoquée via `adb`, permission système répondue « Keep approximate
+location ») : la carte affiche bien « Position approximative » avec le rayon
+GPS, l'écran de confirmation encadre la position en rouge, et le SMS composé
+contenait effectivement `POSITION APPROX +/- qq km` (143/160 caractères,
+1 SMS). Non vérifié sur iOS — nécessite l'app iOS compilée (EAS), voir §2.2.
+
+Non fait : la demande de précision temporaire complète
+(`requestTemporaryFullAccuracyPermissionAsync`, iOS uniquement, exige une
+« purpose key » déclarée dans `Info.plist`). Écarté pour l'instant : plus
+complexe, spécifique à une plateforme, et l'avertissement clair dans le
+message est déjà la protection qui compte pour la sécurité du signalement.
 
 ### 4.4 Carte
 
@@ -336,12 +385,9 @@ publication publique.
 
 | # | Sujet | Pourquoi |
 |---|---|---|
-| 1 | **Précision réduite (§4.3)** | Une position approximative produit une maille DFCI fausse — le seul défaut du portage qui puisse tromper les secours. À traiter en premier. |
-| 2 | Écran de démarrage | Aucun n'est configuré ; iOS affichera un écran blanc. `expo-splash-screen` avec `assets/splash-icon.png`. |
-| 3 | Vérifier `PrivacyInfo.xcprivacy` | Après la première compilation, §4.5. |
+| 1 | ~~Précision réduite~~ | **Traité** le 29/07/2026, voir §4.3 — pour les deux plateformes à la fois. |
+| 2 | ~~Écran de démarrage~~ | **Traité** le 29/07/2026 — `expo-splash-screen` configuré explicitement (fond `#32A6F9`, logo), plutôt que de compter sur un défaut non vérifiable pour iOS depuis Windows. |
+| 3 | Vérifier `PrivacyInfo.xcprivacy` | Après la première compilation EAS — impossible à vérifier avant, le fichier n'existe que dans le projet iOS généré (voir §2.2 : generation refusée sous Windows). |
 | 4 | Page de politique de confidentialité | Obligatoire pour la fiche, à héberger. |
 | 5 | Essai du composeur SMS sur iPhone | `isAvailableAsync` étant faux sur simulateur, ce chemin n'est vérifiable qu'en réel. |
-
-Le point 1 concerne aussi Android : depuis Android 12, l'utilisateur peut lui
-aussi n'accorder qu'une position approximative. Le correctif est à faire dans
-`useAircraftPosition.ts`, une fois, pour les deux plateformes.
+| 6 | Essai réel de la position approximative sur iPhone | Le correctif du point 1 est vérifié par la logique (tests unitaires, lecture du bon champ d'API) mais pas par un appareil réel en mode « position approximative » — à faire en même temps que le point 5. |

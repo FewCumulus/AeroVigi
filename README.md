@@ -221,6 +221,49 @@ avec position GPS simulée au-dessus d'Aix-en-Provence :
 Ce qu'un émulateur ne peut pas valider : la réception réelle par le 114, la
 qualité du GPS en vol, et la lisibilité en plein soleil.
 
+### R8 en optimisation complète
+
+Depuis la 1.2.0, `build.gradle` utilise `proguard-android-optimize.txt` au lieu
+de `proguard-android.txt` (ce dernier contient `-dontoptimize`, qui désactive la
+passe d'optimisation de R8 — seuls le rétrécissement et l'obfuscation des noms
+s'appliquaient jusque-là). C'est un changement plus agressif que la simple
+activation de R8 : testé de bout en bout sur appareil (installation, carte,
+GPS, marque verticale, écran de signalement, ouverture du composeur SMS,
+double appui retour pour quitter), aucune régression constatée.
+
+### Recommandations Play Console non retenues
+
+Trois points du rapport « Actions recommandées » de Play Console ne viennent
+pas de notre code, mais de bibliothèques bundlées par React Native 0.86 /
+Expo SDK 57 :
+
+- **Appels dépréciés pour l'affichage bord à bord**
+  (`Window.setStatusBarColor` etc.) : émis automatiquement par le cœur de
+  React Native (`WindowUtilKt.enableEdgeToEdge`, `StatusBarModule`) et par
+  Google Material Components, à l'initialisation de l'activité — pas par notre
+  JS. Les journaux confirment que `StatusBarModule` neutralise déjà ces appels
+  sous edge-to-edge (« Ignored status bar change ») : sans effet visuel, juste
+  présents dans le bytecode. Une bibliothèque de remplacement existe
+  (`react-native-edge-to-edge`), mais sa propre documentation déconseille de
+  l'utiliser sur RN 0.81+ (on est déjà sur le mécanisme natif recommandé), et
+  rien ne garantit qu'elle retirerait l'appel de `WindowUtilKt`, qui est interne
+  au cœur de RN. Non tenté : changement de thème natif risqué pour un gain
+  incertain.
+- **Chargement d'images réseau non optimisé** (Fresco) : l'application n'a
+  aucun composant `<Image>` chargeant une URL distante — la carte est une
+  WebView (Chromium), pas le pipeline d'images de React Native. Fresco est
+  bundlé par le cœur de RN qu'on l'utilise ou non.
+- **AGP 9.0 ou ultérieur** : la version d'AGP est fixée par
+  `@react-native/gradle-plugin` (8.12.0 pour RN 0.86), un fichier de
+  `node_modules` régénéré à chaque installation — non modifiable sans une
+  montée de version majeure de React Native.
+
+Aucun de ces trois points n'est classé bloquant par Play Console (catégories
+« Expérience utilisateur » / « Qualité technique »). Le verrouillage portrait
+(cf. plus haut) n'est pas non plus retenu, pour la même raison de non-blocage
+et un motif d'usage plus fort : testé en rotation, la mise en page casse
+réellement (bouton d'alerte chevauchant la carte).
+
 ---
 
 ## Outils de génération
@@ -232,7 +275,7 @@ Les fichiers `src/data/*` et `src/lib/mapHtml.ts` sont **générés** — ne pas
 |---|---|
 | `node tools/build-dfci-grid.js` | `src/data/dfciGrid.ts` — la grille DFCI dérivée du shapefile officiel, vérifiée sur ses 339 264 mailles, en 11 Ko. Le shapefile source (~130 Mo) n'est pas versionné : voir l'en-tête du script pour sa provenance |
 | `node tools/build-map-html.js` | `src/lib/mapHtml.ts` — la page Leaflet embarquée (Leaflet 1.9.4 intégré, pour que la carte fonctionne sans réseau) |
-| `node tools/apply-signing.js` | correctifs du projet Android généré : signature de release, report de la version d'`app.json` dans `build.gradle` (`versionName` et `versionCode`, que le prebuild seul ne met pas à jour), retrait des permissions déclarées par React Native mais inutilisées ici (dont `SYSTEM_ALERT_WINDOW`), et retrait des attributs de thème dépréciés pour l'affichage bord à bord (`android:statusBarColor` / `android:navigationBarColor`, déjà transparents par défaut sous edge-to-edge). À relancer après chaque `expo prebuild`, et après chaque changement de version |
+| `node tools/apply-signing.js` | correctifs du projet Android généré : signature de release, activation de l'optimisation R8 complète (`proguard-android-optimize.txt`), report de la version d'`app.json` dans `build.gradle` (`versionName` et `versionCode`, que le prebuild seul ne met pas à jour), retrait des permissions déclarées par React Native mais inutilisées ici (dont `SYSTEM_ALERT_WINDOW`), et retrait des attributs de thème dépréciés pour l'affichage bord à bord (`android:statusBarColor` / `android:navigationBarColor`, déjà transparents par défaut sous edge-to-edge). À relancer après chaque `expo prebuild`, et après chaque changement de version |
 | `powershell -File tools/build-icons.ps1` | les icônes de l'app, dérivées de `docs/Logo AeroVigi clean.png` (l'icône adaptative Android étant recadrée en cercle, le logo est réduit à 66 % pour tenir dans la zone garantie) |
 
 ---

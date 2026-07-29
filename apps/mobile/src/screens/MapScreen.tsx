@@ -32,11 +32,15 @@ export type PickedPoint = {
     lon: number;
     altitudeM: number | null;
     source: 'vertical' | 'map';
+    /** Faux si la position n'est qu'approximative — voir useAircraftPosition. */
+    precise: boolean;
 };
 
 type Props = {
     fix: Fix | null;
     gpsError: string | null;
+    /** Faux si l'utilisateur n'a accordé qu'une position approximative. */
+    precise: boolean;
     grab: () => Fix | null;
     fires: MappedFire[];
     /** Clé OpenAIP saisie par l'utilisateur, prioritaire sur celle du build. */
@@ -53,6 +57,7 @@ const OLD_FIRE_HOURS = 12;
 export function MapScreen({
     fix,
     gpsError,
+    precise,
     grab,
     fires,
     openAipKey,
@@ -171,6 +176,7 @@ export function MapScreen({
             lon: now.lon,
             altitudeM: now.altitudeM,
             source: 'vertical',
+            precise,
         });
     };
 
@@ -202,6 +208,10 @@ export function MapScreen({
                                 lon: m.lng,
                                 altitudeM: grab()?.altitudeM ?? null,
                                 source: 'map',
+                                // Un pointage manuel sur la carte est aussi précis
+                                // que le rendu de la carte le permet — la limite de
+                                // précision propre au GPS ne s'applique pas ici.
+                                precise: true,
                             });
                         }
                     } catch {
@@ -215,9 +225,18 @@ export function MapScreen({
                 <View style={s.card}>
                     {fix ? (
                         <>
-                            <Text style={s.dfci}>
-                                {dfci ? `DFCI ${dfci.spaced}` : 'Hors carroyage DFCI'}
-                            </Text>
+                            {precise ? (
+                                <Text style={s.dfci}>
+                                    {dfci ? `DFCI ${dfci.spaced}` : 'Hors carroyage DFCI'}
+                                </Text>
+                            ) : (
+                                // Une position approximative (quelques km) peut
+                                // désigner la mauvaise maille DFCI : mieux vaut ne
+                                // pas l'afficher que d'afficher un code faux.
+                                <Text style={[s.dfci, { color: C.alert, fontSize: 20 }]}>
+                                    Position approximative
+                                </Text>
+                            )}
                             <Text style={s.dd}>{formatDD(fix.lat, fix.lon)}</Text>
                             <Text style={[s.meta, stale && { color: C.warn }]}>
                                 {`GPS ${

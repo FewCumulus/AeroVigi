@@ -175,6 +175,66 @@ const { importApp } = require('./_apptest');
     check('suivi « maîtrisé »', contained.text.startsWith('FEU SEMBLE MAITRISE vu d avion'));
     check('suivi « maîtrisé » tient en un SMS', contained.sms.segments === 1);
 
+    console.log('\n5c. Position approximative (iOS/Android « position réduite »)');
+    const imprecise = message.buildAlertMessage(
+        {
+            lat: 43.5297,
+            lon: 5.4474,
+            altitudeM: 1066.8,
+            fireType: 'foret',
+            severity: 'important',
+            intention: 'reste',
+            at: new Date(Date.UTC(2026, 6, 26, 14, 32)),
+            precise: false,
+        },
+        observer,
+    );
+    console.log('\n--- position approximative ---\n' + imprecise.text + '\n------------------------------');
+    check(
+        'avertissement de position présent',
+        imprecise.text.includes('POSITION APPROX'),
+        imprecise.text,
+    );
+    // C'est une ligne essentielle : même un nom d'observateur démesuré ne doit
+    // pas la faire sauter (contrairement aux lignes de confort).
+    const impreciseLongName = message.buildAlertMessage(
+        {
+            lat: 43.5297,
+            lon: 5.4474,
+            altitudeM: 1066.8,
+            fireType: 'foret',
+            severity: 'important',
+            intention: 'reste',
+            at: new Date(),
+            precise: false,
+        },
+        {
+            name: 'X'.repeat(90),
+            aircraftReg: 'F-HABCD',
+            radioFreq: '123.500',
+            mentionInFlight: true,
+        },
+    );
+    check(
+        'avertissement jamais écarté, même avec un nom démesuré',
+        impreciseLongName.text.includes('POSITION APPROX'),
+    );
+    check(
+        'precise non renseigné = comportement inchangé (rétrocompatible)',
+        !message.buildAlertMessage(
+            {
+                lat: 43.5297,
+                lon: 5.4474,
+                altitudeM: 1066.8,
+                fireType: 'foret',
+                severity: null,
+                intention: null,
+                at: new Date(),
+            },
+            observer,
+        ).text.includes('POSITION APPROX'),
+    );
+
     // Cas défavorable : nom long, pour vérifier que le compteur reste juste.
     const long = message.buildAlertMessage(
         {

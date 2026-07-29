@@ -103,6 +103,30 @@ if (!props.includes('AEROVIGI_STORE_FILE')) {
 
 console.log('Signature de release appliquée.');
 
+// --- Optimisation R8 complète ------------------------------------------------
+// Le gabarit React Native pointe sur `proguard-android.txt`, qui contient
+// `-dontoptimize` : seuls le rétrécissement et l'obfuscation des noms
+// s'appliquent, la passe d'optimisation de R8 (fusion de classes, inlining…)
+// reste désactivée. C'est exactement ce que Play Console signale par
+// « l'optimisation n'est pas activée » — `proguard-android-optimize.txt` est
+// le même fichier sans cette ligne. AGP 9.0 ne proposera même plus l'ancienne
+// variante (Play recommande d'ailleurs de migrer vers AGP 9.0, ce que cette
+// bascule anticipe sans attendre une mise à jour majeure de React Native).
+{
+    let g = fs.readFileSync(GRADLE, 'utf8');
+    const before = g;
+    g = g.replace(
+        /getDefaultProguardFile\("proguard-android\.txt"\)/,
+        'getDefaultProguardFile("proguard-android-optimize.txt")',
+    );
+    if (g === before && !g.includes('proguard-android-optimize.txt')) {
+        console.error('Impossible d’activer l’optimisation R8 — build.gradle inattendu.');
+        process.exit(1);
+    }
+    fs.writeFileSync(GRADLE, g, 'utf8');
+    console.log('Optimisation R8 complète activée (proguard-android-optimize.txt).');
+}
+
 // --- Version ----------------------------------------------------------------
 // `versionName` et `versionCode` viennent de build.gradle, figé au dernier
 // prebuild : modifier `version` dans app.json ne suffit donc pas à changer la

@@ -55,7 +55,7 @@ export default function App() {
     const [profile, setProfile] = useState<Observer>(EMPTY_PROFILE);
     const [reports, setReports] = useState<StoredReport[]>([]);
     const [mapMounted, setMapMounted] = useState(false);
-    const { fix, error, grab } = useAircraftPosition();
+    const { fix, error, precise, grab } = useAircraftPosition();
 
     const fires = useMemo(() => firesFromReports(reports), [reports]);
 
@@ -91,6 +91,10 @@ export default function App() {
                     lon: fire.lon,
                     altitudeM: grab()?.altitudeM ?? null,
                     source: 'map',
+                    // Position déjà enregistrée du feu, pas une nouvelle lecture
+                    // GPS : la limite de précision de la localisation en cours ne
+                    // s'applique pas à ce point.
+                    precise: true,
                 },
                 parent: { id: fire.id, at: fire.at, dfci: fire.dfci },
             });
@@ -262,6 +266,7 @@ export default function App() {
                     <MapScreen
                         fix={fix}
                         gpsError={error}
+                        precise={precise}
                         grab={grab}
                         fires={fires}
                         openAipKey={profile.openAipKey}

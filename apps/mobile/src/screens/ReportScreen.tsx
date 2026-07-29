@@ -73,6 +73,7 @@ export function ReportScreen({
                     severity,
                     intention,
                     at,
+                    precise: point.precise,
                 },
                 observer,
             ),
@@ -122,7 +123,7 @@ export function ReportScreen({
             <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
                 <Text style={s.h1}>{isUpdate ? 'Mise à jour du feu' : 'Signalement'}</Text>
 
-                <View style={s.posCard}>
+                <View style={[s.posCard, !point.precise && { borderColor: C.alert, borderWidth: 2 }]}>
                     <Text style={s.dfci}>
                         {built.dfci
                             ? `DFCI ${built.dfci.slice(0, 2)} ${built.dfci.slice(2, 4)} ${built.dfci[4]} ${built.dfci[5]}`
@@ -139,6 +140,12 @@ export function ReportScreen({
                               ? 'Position de l’avion à l’appui (verticale)'
                               : 'Point relevé sur la carte'}
                     </Text>
+                    {!point.precise ? (
+                        <Text style={[s.meta, { color: C.alert, fontWeight: '800', marginTop: 6 }]}>
+                            Position approximative (quelques km) — le DFCI ci-dessus peut
+                            désigner la mauvaise maille. Le message l’indique aux secours.
+                        </Text>
+                    ) : null}
                 </View>
 
                 <Text style={s.h2}>{isUpdate ? 'Nouvel élément' : 'Type'}</Text>
